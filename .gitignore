@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.bin
+*.pt
+*.h5
+*.mp4
+*.csv
+*.wav
+*.safetensors
+*.onnx
+vosk-model/
