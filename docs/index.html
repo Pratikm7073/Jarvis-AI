@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>J.A.R.V.I.S. — Daily Dashboard</title>
+<meta name="description" content="Gesture-controlled personal daily dashboard: tasks, gym, calendar, news, markets.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='38' fill='none' stroke='%235ce1e6' stroke-width='8'/><circle cx='50' cy='50' r='14' fill='%235ce1e6'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..700&family=Geist+Mono:wght@300..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/base.css">
+<link rel="stylesheet" href="./css/gestures.css">
+</head>
+<body>
+
+<div class="bg-layer"><canvas id="bg3d"></canvas></div>
+<div class="grain"></div>
+<div class="vignette"></div>
+
+<!-- ─── TODAY STRIP (sticky header) ─────────────────── -->
+<header id="todayStrip">
+  <div class="ts-left">
+    <span id="tsClock">--:--</span>
+    <span id="tsDate">·</span>
+  </div>
+  <div class="ts-mid" id="tsGreeting">Initializing…</div>
+  <div class="ts-right">
+    <span id="tsWeather" class="ts-chip" title="Weather">—</span>
+    <span id="tsStatus" class="ts-chip ok">SYSTEMS NOMINAL</span>
+  </div>
+</header>
+
+<!-- ─── REACTOR STAGE ───────────────────────────────── -->
+<section id="reactorStage">
+  <canvas id="reactorCanvas"></canvas>
+  <div id="reactorLine">ULTRON CORE ONLINE<span class="ai-caret"></span></div>
+</section>
+
+<!-- ─── WIDGET GRID (cards injected by main.js) ─────── -->
+<main id="grid" aria-label="Dashboard widgets"></main>
+
+<footer>
+  <span>© 2026 Pratik More</span>
+  <span><span class="l">J.A.R.V.I.S.</span> // runs 100% in your browser</span>
+</footer>
+
+<!-- ─── FOCUS MODE OVERLAY ──────────────────────────── -->
+<div id="focusLayer" aria-hidden="true">
+  <div class="fl-backdrop"></div>
+  <div class="fl-card" id="focusCard">
+    <button class="fl-close" id="focusClose" aria-label="Close">×</button>
+    <div class="fl-head"><span class="fl-icon" id="focusIcon"></span><span class="fl-title" id="focusTitle"></span></div>
+    <div class="fl-body" id="focusBody"></div>
+  </div>
+</div>
+
+<!-- ─── GESTURE CONTROL UI ──────────────────────────── -->
+<button id="gestureBtn" type="button"><span class="gb-dot"></span>✋ Gesture Control</button>
+<div id="gestureHud">
+  <video id="gestureCam" playsinline muted></video>
+  <div class="g-status" id="gStatus">Starting camera…</div>
+  <div class="g-help"><b>✋ Move</b> cursor · <b>hand high/low</b> scroll · <b>✊ fist</b> turbo · <b>🤏 pinch a card</b> open it · <b>🤏 pinch ×2</b> close · <b>swipe fast</b> next widget / tab · <b>🔒 grab Ultron's head</b> (pinch-hold / palm / fist over it) then rotate your wrist · <b>🙌 both hands</b> drag = rotate · apart/together = zoom</div>
+  <div class="g-priv">⛨ runs 100% in your browser — nothing is uploaded</div>
+</div>
+<div id="handCursor"><div class="hc-ring"></div><div class="hc-core"></div><div class="hc-pulse"></div><div class="hc-arr u">▲</div><div class="hc-arr d">▼</div></div>
+
+<script type="importmap">
+{
+  "imports":{
+    "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
