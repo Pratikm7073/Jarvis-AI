@@ -9,7 +9,7 @@ Two Jarvis experiences in one repo:
 
 ## Part 1 — J.A.R.V.I.S. Dashboard (web)
 
-A gesture-controlled daily dashboard that runs 100% in your browser: an animated arc-reactor centerpiece, plus widgets for **Tasks**, **Gym plan**, **Calendar**, **Today's News**, **Markets** (India · US · UK · Crypto) and **Settings**. Point at a card and pinch to open it fullscreen; grab the reactor and rotate your wrist to spin it — mouse and touch always work too.
+A gesture-controlled daily dashboard that runs 100% in your browser: a chrome **Ultron head** with glowing red eyes floating in a **deep-space starfield with a live supernova**, plus widgets for **Tasks**, **Gym plan**, **Calendar**, **Today's News**, **Markets** (India · US · UK · Crypto) and **Settings**. Point at a card and pinch to open it fullscreen; grab Ultron's head and rotate your wrist to spin it — mouse and touch always work too.
 
 ### Run it locally
 
@@ -37,8 +37,8 @@ Click **✋ Gesture Control** (bottom-right) and allow the camera. Then:
 | 🤏 pinch | over a card → **open it** · over a button → click | click tabs, checkboxes, day cells |
 | 🤏 pinch ×2 quickly | — | **close the widget** |
 | 👋 fast horizontal swipe | highlight next / prev card | next / prev tab (News, Markets) |
-| 🔒 pinch-hold / ✊ / ✋-hold **over the reactor**, then rotate your wrist | the reactor mirrors your hand | the open card 3D-tilts with your wrist |
-| 🙌 both hands: drag / twist / spread | rotate · roll · zoom the reactor | tilt + zoom the card |
+| 🔒 pinch-hold / ✊ / ✋-hold **over Ultron's head**, then rotate your wrist | the head mirrors your hand | the open card 3D-tilts with your wrist |
+| 🙌 both hands: drag / twist / spread | rotate · roll · zoom the head | tilt + zoom the card |
 
 Tips: keep your hand ~50–80 cm from the camera in decent light. If tracking drops for a moment the cursor dims instead of vanishing — just keep going. Add `?debug=1` to the URL to drive the same actions from the keyboard (mouse = cursor, `P` = pinch, `[` `]` = swipe, `Shift+↑/↓` = scroll).
 
@@ -65,7 +65,7 @@ Each widget shows where its data came from: `LIVE · <provider>`, `PROXY · <ETF
 
 ### Under the hood
 
-Hand-authored ES modules, no build step. Three.js (pinned `0.160.0`) renders the reactor; MediaPipe Hands (pinned, lazy-loaded only when you enable gestures) does the tracking at ~15 fps on a 320×240 feed. If the CDN is unreachable the 3D/gesture layer switches off and the dashboard keeps working with mouse/touch.
+Hand-authored ES modules, no build step. Three.js (pinned `0.160.0`) renders the Ultron head and the nebula/starfield/supernova background (a domain-warped fbm shader running at 30 fps at reduced resolution); MediaPipe Hands (pinned, lazy-loaded only when you enable gestures) does the tracking at ~15 fps on a 320×240 feed. If the CDN is unreachable the 3D/gesture layer switches off and the dashboard keeps working with mouse/touch.
 
 ```
 docs/
@@ -73,7 +73,8 @@ docs/
 ├── css/                  base.css · gestures.css
 └── js/
     ├── main.js           widget registry · focus mode · scheduler
-    ├── reactor.js        Three.js arc reactor
+    ├── reactor.js        Three.js Ultron head centerpiece
+    ├── background.js     deep-space nebula + starfield + supernova
     ├── gestures.js       MediaPipe hand-tracking engine
     ├── api.js            provider chains + fallbacks
     ├── store.js          localStorage + TTL cache

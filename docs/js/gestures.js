@@ -16,7 +16,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const MP_HANDS = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
 
-export function initGestures({ reactorApi, focusApi, widgets }) {
+export function initGestures({ reactorApi, focusApi, widgets, bg }) {
   const btn = document.getElementById('gestureBtn');
   const hud = document.getElementById('gestureHud');
   const video = document.getElementById('gestureCam');
@@ -118,6 +118,7 @@ export function initGestures({ reactorApi, focusApi, widgets }) {
   /* what a pinch DOES at (smX, smY) — shared by camera + debug paths */
   function pinchAction(now = performance.now()) {
     reactorApi.pulse();
+    bg && bg.pulse(smX / innerWidth, smY / innerHeight);   // starfield shockwave
     const el = document.elementFromPoint(smX, smY);
     const dbl = now - lastPinchAt < 700; lastPinchAt = now;
     if (focusApi.isOpen()) {
@@ -224,8 +225,9 @@ export function initGestures({ reactorApi, focusApi, widgets }) {
     smX = lerp(smX, nx * innerWidth, .3); smY = lerp(smY, ny * innerHeight, .3);
     cursor.style.display = 'block';
     cursor.style.transform = `translate(${smX}px,${smY}px)`;
-    /* parallax: hand steers the reactor's idle gaze */
+    /* parallax: hand steers the head's idle gaze + the starfield */
     reactorApi.setPointer(nx * 2 - 1, ny * 2 - 1);
+    bg && bg.setPointer(nx * 2 - 1, ny * 2 - 1);
     setHover(document.elementFromPoint(smX, smY));
 
     /* hand geometry: size + how folded each finger is */
@@ -358,7 +360,7 @@ export function initGestures({ reactorApi, focusApi, widgets }) {
     hud.classList.remove('on'); cursor.style.display = 'none';
     cursor.classList.remove('scrollUp', 'scrollDn', 'lost', 'pinch');
     btn.classList.remove('live'); btn.innerHTML = '<span class="gb-dot"></span>✋ Gesture Control';
-    reactorApi.releasePointer(); setHover(null);
+    reactorApi.releasePointer(); bg && bg.releasePointer(); setHover(null);
     lastX = null; pinched = false; scrollVel = 0; lastSeen = 0; pinchCool = 0; lastPinchAt = 0;
     twoHand = false; grab = null; palmHold = 0;
   }

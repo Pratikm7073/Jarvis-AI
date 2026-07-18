@@ -105,11 +105,11 @@ addEventListener('jarvis:settings-changed', () => {
 
 /* reactor status line typewriter */
 const LINES = [
-  'J.A.R.V.I.S. ONLINE — ALL SYSTEMS NOMINAL',
+  'ULTRON CORE ONLINE — ALL SYSTEMS NOMINAL',
+  'THERE ARE NO STRINGS ON ME',
   'PINCH A CARD TO OPEN IT',
-  'GRAB THE REACTOR AND ROTATE YOUR WRIST',
+  'GRAB MY HEAD — ROTATE YOUR WRIST',
   'BOTH HANDS: ROTATE · TWIST · ZOOM',
-  'AT YOUR SERVICE, SIR',
 ];
 function startTypewriter() {
   const lineEl = document.getElementById('reactorLine');
@@ -134,12 +134,16 @@ function startTypewriter() {
    and the dashboard must survive that CDN being down —
    widgets + mouse control keep working regardless */
 try {
-  const [{ initReactor }, { initGestures }] = await Promise.all([
+  const [{ initReactor }, { initGestures }, { initBackground }] = await Promise.all([
     import('./reactor.js'),
     import('./gestures.js'),
+    import('./background.js'),
   ]);
+  let bg = null;
+  try { bg = initBackground(); }   // null on reduced-motion; must never kill the head
+  catch (e) { console.warn('space background unavailable', e); }
   const reactorApi = initReactor(document.getElementById('reactorCanvas'));
-  initGestures({ reactorApi, focusApi, widgets });
+  initGestures({ reactorApi, focusApi, widgets, bg });
   startTypewriter();
 } catch (e) {
   console.warn('3D/gesture engine unavailable (CDN unreachable?)', e);
