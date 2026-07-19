@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JARVIS OS — Command Center</title>
+<meta name="description" content="JARVIS OS command center — system diagnostics, quantum network analytics, AI terminal.">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#07080a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..700&family=Geist+Mono:wght@300..600&display=swap" rel="stylesheet">
+<!-- pinned, no build step: React + Recharts + Lucide + Tailwind play -->
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/prop-types@15.8.1/prop-types.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+<script>window.react = window.React;   /* lucide-react's UMD expects a lowercase `react` global */</script>
+<script src="https://cdn.jsdelivr.net/npm/lucide-react@0.462.0/dist/umd/lucide-react.min.js" crossorigin></script>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      abyss: '#07080a', panel: '#0b0f19',
+      neon: '#5ce1e6', cobalt: '#3b6cff', holo: '#8b6dff', ember: '#ffc45c',
+    },
+    fontFamily: {
+      sans: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+      mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
+    },
+    boxShadow: {
+      'glow-cyan': '0 0 24px rgba(92,225,230,.22), inset 0 1px 0 rgba(255,255,255,.06)',
+      'glow-violet': '0 0 24px rgba(139,109,255,.22), inset 0 1px 0 rgba(255,255,255,.06)',
+    },
+  } },
+};
+</script>
+<style>
+body{background:
+  radial-gradient(60vw 40vh at 75% -10%, rgba(59,108,255,.10), transparent 60%),
+  radial-gradient(50vw 40vh at 10% 110%, rgba(139,109,255,.08), transparent 60%),
+  #07080a}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:rgba(92,225,230,.25);border-radius:3px}
+.glass{background:linear-gradient(150deg,rgba(20,26,44,.66),rgba(8,10,18,.8));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08)}
+.hairline{background:linear-gradient(90deg,transparent 4%,rgba(92,225,230,.5) 50%,transparent 96%) top/100% 1.5px no-repeat}
+.term::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12)}
+@keyframes ringDash{from{stroke-dashoffset:264}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+</style>
+</head>
+<body class="text-slate-200 font-sans antialiased overflow-x-hidden">
+<div id="root"></div>
+
+<script>
+const { useState, useEffect, useRef, useCallback, createElement } = React;
+const html = htm.bind(createElement);
+const { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } = Recharts;
+const L = LucideReact;
+
+/* ── helpers ─────────────────────────────────────── */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const drift = (v, amt, a, b) => clamp(v + (Math.random() - 0.5) * amt, a, b);
+const stamp = () => new Date().toLocaleTimeString('en-GB', { hour12: false });
+
+function makeSeries(n, base, vol) {
+  const out = []; let v = base, e = 62, q = 40;
+  for (let i = 0; i < n; i++) {
+    v = clamp(v + (Math.random() - 0.5) * vol, 8, 96);
+    e = clamp(e + (Math.random() - 0.5) * 6, 30, 98);
+    q = clamp(q + (Math.random() - 0.48) * 8, 5, 90);
+    out.push({ t: i, traffic: +v.toFixed(1), efficiency: +e.toFixed(1), quantum: +q.toFixed(1) });
+  }
+  return out;
+}
+
+/* ── atoms ───────────────────────────────────────── */
+const Icon = ({ i, size = 15, cls = '' }) => html`<${i} size=${size} strokeWidth=${1.6} className=${cls}/>`;
+
+function Ring({ label, value, unit, color, icon }) {
+  const R = 42, C = 2 * Math.PI * R;
+  return html`
+    <div class="glass hairline rounded-2xl p-4 flex flex-col items-center gap-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-glow-cyan">
+      <div class="flex items-center gap-2 self-start text-[10px] font-mono tracking-[.18em] text-slate-400 uppercase">
+        <${Icon} i=${icon} cls="opacity-80" style=${{color}}/> ${label}
+      </div>
+      <svg viewBox="0 0 100 100" class="w-24 h-24 -rotate-90">
+        <circle cx="50" cy="50" r=${R} fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7"/>
+        <circle cx="50" cy="50" r=${R} fill="none" stroke=${color} stroke-width="7" stroke-linecap="round"
+          stroke-dasharray=${C} stroke-dashoffset=${C * (1 - value / 100)}
+          style=${{ transition: 'stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1)', filter: `drop-shadow(0 0 6px ${color})` }}/>
+      </svg>
+      <div class="-mt-16 mb-6 rotate-0 text-center">
+        <div class="font-mono text-xl font-semibold tabular-nums" style=${{ color }}>${Math.round(value)}<span class="text-[10px] text-slate-400">${unit}</span></div>
+      </div>
+    </div>`;
+}
+
+/* ── panels ──────────────────────────────────────── */
+function Header({ core }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  return html`
+    <header class="glass hairline rounded-2xl px-5 py-3.5 flex items-center gap-4 flex-wrap">
+      <a href="./index.html" class="font-mono text-[10px] tracking-[.15em] text-slate-400 border border-white/10 rounded-full px-3 py-1.5 transition-all hover:text-neon hover:border-neon/50 hover:shadow-glow-cyan">← DASHBOARD</a>
+      <div class="flex items-center gap-3">
+        <div class="relative w-9 h-9 rounded-xl bg-gradient-to-br from-neon/80 to-cobalt/40 grid place-items-center shadow-glow-cyan">
+          <${Icon} i=${L.Bot} size=${18} cls="text-abyss"/>
+          <span class="absolute -right-0.5 -top-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+          <span class="absolute -right-0.5 -top-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        </div>
+        <div>
+          <div class="font-mono text-sm tracking-[.22em] text-neon">JARVIS OS <span class="text-slate-500">//</span> <span class="text-emerald-400">SYSTEM ACTIVE</span></div>
+          <div class="font-mono text-[10px] text-slate-500 tracking-[.14em]">AI CORE ${core >= 99 ? 'SYNCHRONIZED' : 'SYNCING ' + core.toFixed(1) + '%'}</div>
+        </div>
+      </div>
+      <div class="ml-auto flex items-center gap-4">
+        <div class="text-right">
+          <div class="font-mono text-lg text-slate-100 tabular-nums leading-none">${now.toLocaleTimeString('en-GB', { hour12: false })}</div>
+          <div class="font-mono text-[10px] text-slate-500 tracking-[.14em] uppercase">${now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</div>
+        </div>
+        <div class="flex items-center gap-2.5 border border-white/10 rounded-full pl-1.5 pr-4 py-1.5 transition-all hover:border-holo/50 hover:shadow-glow-violet">
+          <div class="w-7 h-7 rounded-full bg-gradient-to-br from-holo to-cobalt grid place-items-center text-[11px] font-semibold text-white">PM</div>
+          <div class="leading-tight">
+            <div class="text-xs font-medium text-slate-100">Pratik More</div>
+            <div class="font-mono text-[9px] text-slate-500 tracking-[.12em]">CLEARANCE · ALPHA</div>
+          </div>
+        </div>
+      </div>
+    </header>`;
+}
+
+function Sidebar({ active, setActive }) {
+  const items = [
+    ['core', 'Core Systems', L.Cpu], ['network', 'Quantum Net', L.Network],
+    ['security', 'Security', L.ShieldCheck], ['satellites', 'Satellites', L.Satellite],
+    ['archives', 'Archives', L.Database],
+  ];
+  return html`
+    <aside class="glass hairline rounded-2xl p-3 flex lg:flex-col gap-1.5 overflow-x-auto">
+      ${items.map(([id, label, icon]) => html`
+        <button key=${id} onClick=${() => setActive(id)}
+          class=${`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 font-mono text-[11px] tracking-[.12em] uppercase whitespace-nowrap transition-all duration-200 hover:scale-[1.02] ${active === id
+            ? 'text-abyss bg-gradient-to-r from-neon to-cobalt/80 font-semibold shadow-glow-cyan'
+            : 'text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent hover:border-white/10'}`}>
+          <${Icon} i=${icon}/> ${label}
+        </button>`)}
+      <div class="hidden lg:block mt-auto pt-3 border-t border-white/5 font-mono text-[9.5px] text-slate-500 leading-relaxed px-2">
+        UPLINK <span class="text-emerald-400">STABLE</span><br/>
+        NODES <span class="text-neon tabular-nums">847</span> · PING <span class="text-neon tabular-nums">4ms</span><br/>
+        THREAT LEVEL <span class="text-emerald-400">MINIMAL</span>
+      </div>
+    </aside>`;
+}
+
+function Analytics() {
+  const [range, setRange] = useState('24H');
+  const [lines, setLines] = useState({ traffic: true, efficiency: true, quantum: false });
+  const [data, setData] = useState(() => makeSeries(42, 48, 9));
+  useEffect(() => { setData(makeSeries(range === '1H' ? 24 : range === '24H' ? 42 : 60, 48, range === '7D' ? 14 : 9)); }, [range]);
+  useEffect(() => {
+    const t = setInterval(() => setData(d => {
+      const last = d[d.length - 1];
+      return [...d.slice(1), {
+        t: last.t + 1,
+        traffic: drift(last.traffic, 9, 8, 96),
+        efficiency: drift(last.efficiency, 6, 30, 98),
+        quantum: drift(last.quantum, 8, 5, 90),
+      }];
+    }), 2000);
+    return () => clearInterval(t);
+  }, []);
+  const toggle = k => setLines(s => ({ ...s, [k]: !s[k] }));
+  const chip = (k, label, color) => html`
+    <button key=${k} onClick=${() => toggle(k)}
+      class=${`font-mono text-[9.5px] tracking-[.12em] uppercase rounded-full px-3 py-1 border transition-all duration-200 hover:scale-105 ${lines[k] ? 'text-abyss font-semibold' : 'text-slate-500 border-white/10 hover:text-slate-200'}`}
+      style=${lines[k] ? { background: color, borderColor: color, boxShadow: `0 0 14px ${color}55` } : {}}>${label}</button>`;
+  return html`
+    <section class="glass hairline rounded-2xl p-5">
+      <div class="flex items-center gap-3 flex-wrap mb-4">
+        <${Icon} i=${L.Activity} cls="text-neon"/>
+        <h2 class="font-mono text-[11px] tracking-[.2em] text-neon uppercase">Quantum Network Traffic</h2>
+        <div class="flex gap-1.5 ml-2">${chip('traffic', 'Traffic', '#5ce1e6')}${chip('efficiency', 'Efficiency', '#8b6dff')}${chip('quantum', 'Entanglement', '#ffc45c')}</div>
+        <div class="ml-auto flex gap-1">
+          ${['1H', '24H', '7D'].map(r => html`
+            <button key=${r} onClick=${() => setRange(r)}
+              class=${`font-mono text-[10px] tabular-nums rounded-lg px-2.5 py-1 border transition-all ${range === r ? 'text-neon border-neon/60 bg-neon/10 shadow-glow-cyan' : 'text-slate-500 border-white/10 hover:text-slate-200'}`}>${r}</button>`)}
+        </div>
+      </div>
+      <div class="h-64">
+        <${ResponsiveContainer} width="100%" height="100%">
+          <${AreaChart} data=${data} margin=${{ top: 4, right: 6, bottom: 0, left: -22 }}>
+            <defs>
+              <linearGradient id="gT" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5ce1e6" stop-opacity=".45"/><stop offset="100%" stop-color="#5ce1e6" stop-opacity="0"/></linearGradient>
+              <linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8b6dff" stop-opacity=".4"/><stop offset="100%" stop-color="#8b6dff" stop-opacity="0"/></linearGradient>
+              <linearGradient id="gQ" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffc45c" stop-opacity=".35"/><stop offset="100%" stop-color="#ffc45c" stop-opacity="0"/></linearGradient>
+            </defs>
+            <${CartesianGrid} strokeDasharray="3 6" stroke="rgba(255,255,255,.05)" vertical=${false}/>
+            <${XAxis} dataKey="t" tick=${false} axisLine=${{ stroke: 'rgba(255,255,255,.08)' }}/>
+            <${YAxis} tick=${{ fill: '#556', fontSize: 10, fontFamily: 'Geist Mono' }} axisLine=${false} tickLine=${false}/>
+            <${Tooltip} contentStyle=${{ background: 'rgba(8,10,18,.92)', border: '1px solid rgba(92,225,230,.3)', borderRadius: 12, fontFamily: 'Geist Mono', fontSize: 11 }} labelFormatter=${() => ''}/>
+            ${lines.traffic && html`<${Area} type="monotone" dataKey="traffic" stroke="#5ce1e6" strokeWidth=${2} fill="url(#gT)" dot=${false} isAnimationActive=${false} style=${{ filter: 'drop-shadow(0 0 5px rgba(92,225,230,.6))' }}/>`}
+            ${lines.efficiency && html`<${Area} type="monotone" dataKey="efficiency" stroke="#8b6dff" strokeWidth=${2} fill="url(#gE)" dot=${false} isAnimationActive=${false} style=${{ filter: 'drop-shadow(0 0 5px rgba(139,109,255,.6))' }}/>`}
+            ${lines.quantum && html`<${Area} type="monotone" dataKey="quantum" stroke="#ffc45c" strokeWidth=${2} fill="url(#gQ)" dot=${false} isAnimationActive=${false} style=${{ filter: 'drop-shadow(0 0 5px rgba(255,196,92,.6))' }}/>`}
+          <//>
+        <//>
+      </div>
+    </section>`;
+}
+
+function QuickActions({ log }) {
+  const [state, setState] = useState({});
+  const [firewall, setFirewall] = useState(true);
+  const actions = [
+    ['init', 'Initialize Protocol', L.Rocket, 'Protocol THETA-9 initialized'],
+    ['optimize', 'Optimize System', L.Gauge, 'System optimized · latency -18%'],
+    ['purge', 'Purge Cache', L.Trash2, 'Cache purged · 2.4 GB reclaimed'],
+  ];
+  const run = (id, msg) => {
+    if (state[id] === 'busy') return;
+    setState(s => ({ ...s, [id]: 'busy' }));
+    log(`⟳ ${msg.split(' ·')[0]}…`);
+    setTimeout(() => {
+      setState(s => ({ ...s, [id]: 'done' }));
+      log(`✓ ${msg}`);
+      setTimeout(() => setState(s => ({ ...s, [id]: undefined })), 1800);
+    }, 1400 + Math.random() * 900);
+  };
+  const btn = 'group glass rounded-2xl p-4 text-left transition-all duration-200 hover:scale-[1.03] hover:border-neon/40 hover:shadow-glow-cyan active:scale-[.98]';
+  return html`
+    <section class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      ${actions.map(([id, label, icon, msg]) => html`
+        <button key=${id} class=${btn} onClick=${() => run(id, msg)}>
+          <div class="flex items-center justify-between">
+            <${Icon} i=${icon} size=${17} cls=${state[id] === 'done' ? 'text-emerald-400' : 'text-neon'}/>
+            ${state[id] === 'busy' && html`<${Icon} i=${L.LoaderCircle} size=${15} cls="text-neon animate-spin"/>`}
+            ${state[id] === 'done' && html`<${Icon} i=${L.Check} size=${15} cls="text-emerald-400"/>`}
+          </div>
+          <div class="mt-2.5 text-[12.5px] font-medium text-slate-200">${label}</div>
+          <div class="font-mono text-[9px] tracking-[.14em] uppercase mt-1 ${'text-slate-500'}">${state[id] === 'busy' ? 'EXECUTING…' : state[id] === 'done' ? 'COMPLETE' : 'READY'}</div>
+        </button>`)}
+      <button class=${btn} onClick=${() => { setFirewall(f => !f); log(firewall ? '⚠ Firewall DISENGAGED' : '✓ Firewall engaged'); }}>
+        <div class="flex items-center justify-between">
+          <${Icon} i=${firewall ? L.ShieldCheck : L.ShieldOff} size=${17} cls=${firewall ? 'text-emerald-400' : 'text-rose-400'}/>
+          <span class=${`w-8 h-4.5 rounded-full p-0.5 transition-colors ${firewall ? 'bg-emerald-400/80' : 'bg-white/10'}`} style=${{ height: 18 }}>
+            <span class=${`block w-3.5 h-3.5 rounded-full bg-white transition-transform ${firewall ? 'translate-x-3.5' : ''}`}></span>
+          </span>
+        </div>
+        <div class="mt-2.5 text-[12.5px] font-medium text-slate-200">Toggle Firewall</div>
+        <div class=${`font-mono text-[9px] tracking-[.14em] uppercase mt-1 ${firewall ? 'text-emerald-400' : 'text-rose-400'}`}>${firewall ? 'SECURE' : 'EXPOSED'}</div>
+      </button>
+    </section>`;
+}
+
+function Terminal({ log }) {
+  const [hist, setHist] = useState([
+    { c: 'jarvis --boot', o: 'JARVIS OS v5.2 · all systems nominal. Type "help".' },
+  ]);
+  const [val, setVal] = useState('');
+  const endRef = useRef(null);
+  useEffect(() => endRef.current?.scrollIntoView({ block: 'nearest' }), [hist]);
+  const respond = c => {
+    const t = c.toLowerCase().trim();
+    if (t === 'help') return 'commands: status · scan · protocols · uplink · coffee · clear';
+    if (t === 'status') return 'CPU 34% · MEM 61% · NET 842 Mb/s · CORE 36.2°C · threat MINIMAL';
+    if (t === 'scan') return 'deep scan complete — 0 intrusions, 3 anomalies auto-patched.';
+    if (t === 'protocols') return 'THETA-9 armed · HOUSE-PARTY on standby · CLEAN-SLATE locked.';
+    if (t === 'uplink') return 'satellite uplink stable · 847 nodes · 4ms round-trip.';
+    if (t === 'coffee') return 'brewing protocol engaged ☕ — estimated 3 minutes, sir.';
+    if (t.includes('hello') || t.includes('hi')) return 'At your service, sir.';
+    return `unrecognized directive "${c}" — try "help".`;
+  };
+  const submit = e => {
+    e.preventDefault();
+    const c = val.trim();
+    if (!c) return;
+    if (c.toLowerCase() === 'clear') { setHist([]); setVal(''); return; }
+    setHist(h => [...h.slice(-30), { c, o: respond(c) }]);
+    log(`▸ terminal: ${c}`);
+    setVal('');
+  };
+  return html`
+    <section class="glass hairline rounded-2xl p-4 flex flex-col min-h-[220px]">
+      <div class="flex items-center gap-2 mb-2.5 font-mono text-[10px] tracking-[.2em] text-neon uppercase">
+        <${Icon} i=${L.SquareTerminal}/> AI Command Terminal
+      </div>
+      <div class="term flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed space-y-1.5 max-h-44 pr-1">
+        ${hist.map((h, i) => html`
+          <div key=${i}>
+            <div class="text-slate-300"><span class="text-neon">❯</span> ${h.c}</div>
+            <div class="text-slate-500 pl-3.5">${h.o}</div>
+          </div>`)}
+        <div ref=${endRef}></div>
+      </div>
+      <form onSubmit=${submit} class="mt-2.5 flex items-center gap-2 border border-white/10 rounded-xl px-3 py-2 transition-colors focus-within:border-neon/50 focus-within:shadow-glow-cyan">
+        <span class="text-neon font-mono text-xs">❯</span>
+        <input value=${val} onInput=${e => setVal(e.target.value)} placeholder="issue directive…" aria-label="Command input"
+          class="bg-transparent outline-none flex-1 font-mono text-[11.5px] text-slate-100 placeholder:text-slate-600"/>
+        <button class="font-mono text-[9px] tracking-[.12em] text-slate-500 uppercase hover:text-neon transition-colors">enter</button>
+      </form>
+    </section>`;
+}
+
+function TaskLog({ lines }) {
+  return html`
+    <section class="glass hairline rounded-2xl p-4">
+      <div class="flex items-center gap-2 mb-2.5 font-mono text-[10px] tracking-[.2em] text-holo uppercase">
+        <${Icon} i=${L.ScrollText}/> Active Tasks Log
+        <span class="ml-auto flex items-center gap-1.5 text-emerald-400 text-[9px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>LIVE</span>
+      </div>
+      <div class="font-mono text-[10.5px] leading-relaxed space-y-1.5">
+        ${lines.map((l, i) => html`
+          <div key=${l.id} class=${`flex gap-2 ${i === 0 ? 'text-slate-100' : 'text-slate-500'}`} style=${{ opacity: 1 - i * 0.06 }}>
+            <span class="text-neon/70 tabular-nums">[${l.t}]</span><span>${l.m}</span>
+          </div>`)}
+      </div>
+    </section>`;
+}
+
+/* ── app ─────────────────────────────────────────── */
+const FEED = [
+  'Firewall integrity verified', 'Neural network synced', 'Quantum channel re-entangled',
+  'Satellite handshake · NODE-847', 'Threat sweep clean', 'Cache coherence optimal',
+  'Reactor output steady at 98.7%', 'Backup lattice checkpoint saved', 'Latency window renegotiated',
+  'Intrusion honeypot rotated', 'Telemetry burst compressed', 'Holo-projectors calibrated',
+];
+let uid = 0;
+
+function App() {
+  const [active, setActive] = useState('core');
+  const [logs, setLogs] = useState([{ id: uid++, t: stamp(), m: 'Command center online' }]);
+  const [diag, setDiag] = useState({ cpu: 34, mem: 61, net: 72, temp: 36 });
+  const [core, setCore] = useState(97.2);
+  const log = useCallback(m => setLogs(l => [{ id: uid++, t: stamp(), m }, ...l].slice(0, 11)), []);
+  useEffect(() => {
+    const a = setInterval(() => log(FEED[Math.floor(Math.random() * FEED.length)]), 3200);
+    const b = setInterval(() => {
+      setDiag(d => ({
+        cpu: drift(d.cpu, 10, 12, 92), mem: drift(d.mem, 6, 35, 88),
+        net: drift(d.net, 12, 20, 98), temp: drift(d.temp, 1.6, 31, 44),
+      }));
+      setCore(c => clamp(c + (Math.random() - 0.4) * 0.4, 92, 99.9));
+    }, 1600);
+    return () => { clearInterval(a); clearInterval(b); };
+  }, [log]);
+
+  return html`
+    <div class="max-w-[1600px] mx-auto p-3 sm:p-5 flex flex-col gap-4 min-h-screen">
+      <${Header} core=${core}/>
+      <div class="grid gap-4 lg:grid-cols-[190px_1fr_330px] flex-1">
+        <${Sidebar} active=${active} setActive=${setActive}/>
+        <main class="flex flex-col gap-4 min-w-0">
+          <section class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            <${Ring} label="CPU Load" value=${diag.cpu} unit="%" color="#5ce1e6" icon=${L.Cpu}/>
+            <${Ring} label="Memory" value=${diag.mem} unit="%" color="#8b6dff" icon=${L.MemoryStick}/>
+            <${Ring} label="Network" value=${diag.net} unit="%" color="#3b6cff" icon=${L.Wifi}/>
+            <${Ring} label="Core Temp" value=${diag.temp} unit="°C" color="#ffc45c" icon=${L.Thermometer}/>
+          </section>
+          <${Analytics}/>
+          <${QuickActions} log=${log}/>
+        </main>
+        <aside class="flex flex-col gap-4 min-w-0">
+          <${Terminal} log=${log}/>
+          <${TaskLog} lines=${logs}/>
+        </aside>
+      </div>
+      <footer class="font-mono text-[9.5px] tracking-[.14em] text-slate-600 uppercase text-center pb-2">
+        JARVIS OS · quantum lattice v5.2 · <span class="text-neon/70">${'sector ' + active.toUpperCase()}</span> · all channels encrypted
+      </footer>
+    </div>`;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(html`<${App}/>`);
+</script>
+</body>
+</html>
