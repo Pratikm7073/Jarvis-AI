@@ -102,7 +102,9 @@ Each widget shows where its data came from: `LIVE · <provider>`, `PROXY · <ETF
 
 ### Under the hood
 
-Hand-authored ES modules, no build step. Three.js (pinned `0.160.0`) renders the Ultron head and the nebula/starfield/supernova background (a domain-warped fbm shader running at 30 fps at reduced resolution); MediaPipe Hands (pinned, lazy-loaded only when you enable gestures) does the tracking at ~15 fps on a 320×240 feed. If the CDN is unreachable the 3D/gesture layer switches off and the dashboard keeps working with mouse/touch.
+Hand-authored ES modules, no build step. Three.js (pinned `0.160.0`) renders the Ultron head and the nebula/starfield/supernova background (a domain-warped fbm shader running at 30 fps at reduced resolution); MediaPipe Hands (pinned, lazy-loaded only when you enable gestures) does the tracking on a 640×480 feed with a 320×240 fallback. If the CDN is unreachable the 3D/gesture layer switches off and the dashboard keeps working with mouse/touch.
+
+The gesture tracking runs a production-grade signal pipeline (`js/gesture-core.js`, fully unit-tested): **One Euro filtering** (adaptive smoothing — kills cursor jitter with no perceptible lag), a micro-**deadzone**, **hysteresis gates** with frame debounce and cooldowns (no accidental or double-fired pinches), **automatic per-user calibration** of pinch thresholds (hand-size and camera-distance invariant), **motion prediction** that bridges tracking dropouts invisibly, MediaPipe-**confidence gating**, an **interaction box** so screen corners are reachable without stretching to the frame edge, and an **adaptive FPS pacer** that holds real-time on any machine (30 fps on fast hardware, graceful degradation under load, low-light auto-relaxation of detection thresholds).
 
 ```
 docs/
@@ -115,7 +117,9 @@ docs/
     ├── main.js           widget registry · focus mode · scheduler
     ├── reactor.js        Three.js Ultron head centerpiece
     ├── background.js     deep-space nebula + starfield + supernova
-    ├── gestures.js       MediaPipe hand-tracking engine
+    ├── gestures.js       MediaPipe hand-tracking engine (UI layer)
+    ├── gesture-core.js   signal pipeline: One Euro · hysteresis gates ·
+    │                     calibration · prediction · adaptive pacing
     ├── voice.js          Web Speech voice assistant
     ├── api.js            provider chains + fallbacks
     ├── store.js          localStorage + TTL cache

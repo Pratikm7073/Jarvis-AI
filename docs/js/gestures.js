@@ -1,19 +1,27 @@
 /* ════════════════════════════════════════════════════
    GESTURE CONTROL — webcam hand tracking (MediaPipe)
-   ported from pratikm7073.github.io with the couplings
-   swapped for the dashboard:
-     heroApi      → reactorApi   (grab/rotate the reactor)
-     projModalApi → focusApi     (widget focus mode)
-     .work-row    → .widget-card (pinch a card to open it)
-     jumpSection  → cycle cards / tabs
-   every tuned constant is preserved: 700ms tracking-loss
-   grace, 250ms pinch cooldown, ratio<.5 && reach>1.05
-   pinch-vs-fist test, quadratic scroll easing, 66ms loop.
+   production pipeline (see gesture-core.js for the
+   signal-processing classes and the WHY of each):
+
+     camera (640×480→320×240 ladder, any aspect)
+       → MediaPipe Hands (adaptive FPS pacer)
+       → confidence gate (handedness score)
+       → interaction box (relaxed reach → full screen)
+       → One Euro filter + deadzone (zero jitter, no lag)
+       → motion predictor (invisible dropout bridging)
+       → calibrated hysteresis gates (pinch/fist)
+       → UI actions (identical mapping to v1):
+         pinch card=open · pinch×2=close · palm=cursor
+         high/low=scroll · fist=turbo · swipe=cycle
+         grab Ultron=wrist mirror · two hands=rotate/zoom
 ════════════════════════════════════════════════════ */
 import * as THREE from 'three';
+import {
+  clamp, PointFilter, HysteresisGate, Calibrator,
+  MotionPredictor, AdaptivePacer, InteractionBox,
+} from './gesture-core.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const MP_HANDS = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
 
 export function initGestures({ reactorApi, focusApi, widgets, bg }) {
@@ -24,12 +32,25 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
   const cursor = document.getElementById('handCursor');
   if (!btn) return;
 
+  /* ── pipeline instances ── */
+  const box = new InteractionBox();                 // camera window → full screen
+  const pointF = new PointFilter({ minCutoff: 0.7, beta: 0.007, dCutoff: 1.2, deadzone: 1.5 });
+  const predictor = new MotionPredictor({ tau: 0.15, maxMs: 700 });
+  const cal = new Calibrator();
+  const pinchGate = new HysteresisGate({ enter: .45, exit: .6, framesOn: 2, framesOff: 2, cooldownMs: 250 });
+  const fistGate = new HysteresisGate({ enter: .88, exit: .97, framesOn: 3, framesOff: 3, cooldownMs: 0 });
+  const pacer = new AdaptivePacer({ budget: 0.5, minInterval: 33, maxInterval: 100 });
+
+  /* ── state ── */
   let active = false, stream = null, hands = null, loopTimer = null, busy = false;
   let smX = innerWidth / 2, smY = innerHeight / 2, scrollVel = 0, scrollRaf = null;
-  let pinched = false, lastX = null, lastT = 0, swipeCool = 0, lastSeen = 0, pinchCool = 0, lastPinchAt = 0;
+  let lastX = null, lastT = 0, swipeCool = 0, lastSeen = 0, lastPinchAt = 0;
+  let seenFrames = 0;               // entry guard: frames since the hand (re)appeared
+  let pinchLockX = 0, pinchLockY = 0;   // click uses pinch-START coords (no click drift)
   let twoHand = false, pmx = 0, pmy = 0, pang = 0, pspread = 0, rotX = 0, rotY = 0, rotZ = 0, zoomT = 1;
-  let tiltX = 0, tiltY = 0, tiltS = 1;      // focus-mode two-hand tilt state
+  let tiltX = 0, tiltY = 0, tiltS = 1;
   let hoverCard = null, cycleIdx = -1;
+  let lowLightAdapted = false, lastHandAt = 0;
 
   /* ── STARK GRAB: mirror the hand's own 3D orientation ── */
   let grab = null, palmHold = 0;
@@ -40,7 +61,9 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
   const gEuler = new THREE.Euler();
 
   function handQuat(lm, reset) {
-    /* palm frame in view space: mirror x, flip y (screen-down) and z */
+    /* palm frame in view space: mirror x, flip y (screen-down) and z.
+       the basis vectors are themselves low-passed (lerp .45) — rotation
+       gets its own smoothing independent of the cursor filter */
     gUp.set(-(lm[9].x - lm[0].x), -(lm[9].y - lm[0].y), -(lm[9].z - lm[0].z)).normalize();
     gAc.set(-(lm[5].x - lm[17].x), -(lm[5].y - lm[17].y), -(lm[5].z - lm[17].z)).normalize();
     if (reset) { gSmUp.copy(gUp); gSmAc.copy(gAc); }
@@ -115,11 +138,14 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
     status.textContent = '⇄ ' + (c.querySelector('.w-title')?.textContent || 'widget');
   }
 
-  /* what a pinch DOES at (smX, smY) — shared by camera + debug paths */
-  function pinchAction(now = performance.now()) {
+  /* what a pinch DOES at (px, py) — shared by camera + debug paths.
+     coordinates are the pinch-START lock: the hand physically moves
+     while closing a pinch, so firing at the CURRENT cursor would
+     click ~20-40px away from what the user aimed at */
+  function pinchAction(now = performance.now(), px = smX, py = smY) {
     reactorApi.pulse();
-    bg && bg.pulse(smX / innerWidth, smY / innerHeight);   // starfield shockwave
-    const el = document.elementFromPoint(smX, smY);
+    bg && bg.pulse(px / innerWidth, py / innerHeight);   // starfield shockwave
+    const el = document.elementFromPoint(px, py);
     const dbl = now - lastPinchAt < 700; lastPinchAt = now;
     if (focusApi.isOpen()) {
       if (dbl) { focusApi.close(); status.textContent = '✕ Widget closed'; return; }
@@ -159,26 +185,45 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
     hoverCard?.classList.add('g-hover');
   }
 
+  function placeCursor(x, y) {
+    smX = x; smY = y;
+    cursor.style.display = 'block';
+    cursor.style.transform = `translate(${smX}px,${smY}px)`;
+  }
+
   function onResults(r) {
-    busy = false;
     const lm = r.multiHandLandmarks && r.multiHandLandmarks[0];
+    /* handedness score = MediaPipe's own confidence in this hand.
+       below .55 the landmarks are garbage — treat as a dropout. */
+    const conf = r.multiHandedness?.[0]?.score ?? 1;
     const now = performance.now();
-    if (!lm) {
-      twoHand = false; endGrab(); palmHold = 0;
-      /* grace window: tracking drops for a few frames constantly
-         (especially with the hand low in the camera frame) — keep the
-         cursor up AND keep the current scroll velocity going so a
-         downward scroll doesn't die the moment the hand dips out */
-      if (now - lastSeen < 700) { cursor.classList.add('lost'); return; }
+
+    if (!lm || conf < 0.55) {
+      twoHand = false; endGrab(); palmHold = 0; seenFrames = 0;
+      /* dropout bridging: dead-reckon the cursor along its last
+         velocity (decaying) so brief tracking losses are invisible */
+      const p = predictor.predict(now);
+      if (p && now - lastSeen < 700) {
+        placeCursor(p.x, p.y);
+        cursor.classList.add('lost');
+        return;
+      }
       scrollVel *= .85;
       cursor.style.display = 'none'; cursor.classList.remove('lost', 'scrollUp', 'scrollDn');
       setHover(null);
+      pointF.reset(); predictor.reset();
       status.textContent = 'Show your palm ✋';
       return;
     }
-    lastSeen = now; cursor.classList.remove('lost');
+    lastSeen = now; lastHandAt = now; cursor.classList.remove('lost');
+    seenFrames++;
+    /* entry guard: the first frames after a hand appears are the least
+       reliable (motion blur, partial view) — cursor moves immediately,
+       but discrete gestures unlock only after ~5 clean frames */
+    const entryOk = seenFrames >= 5;
+    const confOk = conf >= 0.75;
 
-    /* 🙌 two hands: grid = rotate/twist/zoom the reactor,
+    /* 🙌 two hands: grid = rotate/twist/zoom the head,
        focus mode = tilt/zoom the focused card. Delta-based. */
     const all = r.multiHandLandmarks;
     if (all.length === 2) {
@@ -209,51 +254,57 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
         status.textContent = `🙌 Rotate · twist · zoom ${Math.round(zoomT * 100)}%`;
       }
       pmx = mx; pmy = my; pang = ang; pspread = spread;
-      smX = lerp(smX, mx * innerWidth, .3); smY = lerp(smY, my * innerHeight, .3);
-      cursor.style.display = 'block';
-      cursor.style.transform = `translate(${smX}px,${smY}px)`;
+      placeCursor(lerp(smX, mx * innerWidth, .3), lerp(smY, my * innerHeight, .3));
       cursor.classList.remove('scrollUp', 'scrollDn');
       scrollVel *= .85; lastX = null; grab = null; palmHold = 0;
       return;
     }
     twoHand = false;
-    status.textContent = 'Tracking ✋';
+    status.textContent = confOk ? 'Tracking ✋' : '✋ Hold steady…';
 
-    /* palm centre (middle-finger MCP), mirrored */
+    /* cursor: mirror → interaction box → screen px → One Euro filter.
+       the interaction box means screen corners are reachable without
+       pushing the hand to the frame edge (where tracking dies) */
     const palm = lm[9];
-    const nx = 1 - palm.x, ny = palm.y;
-    smX = lerp(smX, nx * innerWidth, .3); smY = lerp(smY, ny * innerHeight, .3);
-    cursor.style.display = 'block';
-    cursor.style.transform = `translate(${smX}px,${smY}px)`;
+    const ib = box.map(1 - palm.x, palm.y);
+    const f = pointF.filter(ib.x * innerWidth, ib.y * innerHeight, now / 1000);
+    placeCursor(f.x, f.y);
+    predictor.track(smX, smY, now);
+    const nx = ib.x, ny = ib.y;   // box-mapped [0..1] for zones/swipes
+
     /* parallax: hand steers the head's idle gaze + the starfield */
     reactorApi.setPointer(nx * 2 - 1, ny * 2 - 1);
     bg && bg.setPointer(nx * 2 - 1, ny * 2 - 1);
     setHover(document.elementFromPoint(smX, smY));
 
-    /* hand geometry: size + how folded each finger is */
+    /* hand geometry — every distance is divided by palm width, so all
+       thresholds are hand-size- and camera-distance-invariant */
     const hand = Math.hypot(lm[0].x - lm[9].x, lm[0].y - lm[9].y) || .1;
     const fold = i => Math.hypot(lm[i].x - lm[9].x, lm[i].y - lm[9].y) / hand;
     const foldAvg = (fold(8) + fold(12) + fold(16) + fold(20)) / 4;
-    /* pinch vs fist: both bring thumb & index tips together, but a
-       pinch holds the contact point OUT from the wrist while a fist
-       pulls everything in — 'reach' tells them apart reliably */
     const palmW = Math.hypot(lm[5].x - lm[17].x, lm[5].y - lm[17].y) || .08;
     const ratio = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / palmW;
+    /* pinch vs fist: a pinch holds the thumb-index contact point OUT
+       from the wrist, a fist pulls everything in — 'reach' splits them */
     const reach = Math.hypot((lm[4].x + lm[8].x) / 2 - lm[0].x, (lm[4].y + lm[8].y) / 2 - lm[0].y) / palmW;
-    const pinchPose = ratio < .5 && reach > 1.05;
-    const isFist = foldAvg < 0.9 && !pinchPose;
-    const overReactor = reactorUnderCursor();
 
-    /* pinch state machine (what a pinch DOES is decided below) */
-    let pinchStart = false;
-    if (pinchPose && !pinched && now > pinchCool) { pinched = true; pinchCool = now + 250; pinchStart = true; }
-    else if ((ratio > .7 || reach < 0.95) && pinched) { pinched = false; cursor.classList.remove('pinch'); }
+    /* auto-calibration: learn this user's open/pinched range and move
+       the gate thresholds to the proportional sweet spot */
+    cal.observe(ratio);
+    pinchGate.enter = cal.pinchEnter;
+    pinchGate.exit = cal.pinchExit;
+
+    const pinch = pinchGate.update(ratio, now, confOk && entryOk && reach > 1.02);
+    const fist = fistGate.update(foldAvg, now, confOk && entryOk && !pinch.active);
+    const pinched = pinch.active, isFist = fist.active;
+    const overReactor = reactorUnderCursor();
+    cursor.classList.toggle('pinch', pinched);
 
     /* active grab: target mirrors the wrist while the trigger holds */
     if (grab) {
       const alive = grab.mode === 'pinch' ? pinched
         : grab.mode === 'fist' ? (isFist && overReactor)
-        : (overReactor && !isFist && !pinchPose && ny > 0.3 && ny < 0.6);
+        : (overReactor && !isFist && !pinched && ny > 0.3 && ny < 0.6);
       if (alive) {
         updateGrab(lm);
         cursor.classList.remove('scrollUp', 'scrollDn');
@@ -263,10 +314,12 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
       endGrab();
     }
 
-    /* pinch actions: over the reactor = grab it; in focus mode over
-       empty card space = grab-tilt the card; elsewhere = click */
-    if (pinchStart) {
-      cursor.classList.add('pinch', 'burst');
+    /* pinch actions: over Ultron = grab him; in focus mode over empty
+       card space = grab-tilt the card; elsewhere = click (at the
+       pinch-START position — see pinchAction) */
+    if (pinch.rose) {
+      pinchLockX = smX; pinchLockY = smY;
+      cursor.classList.add('burst');
       setTimeout(() => cursor.classList.remove('burst'), 520);
       if (overReactor) {
         startGrab('pinch', lm);
@@ -274,7 +327,7 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
         return;
       }
       if (focusApi.isOpen()) {
-        const el = document.elementFromPoint(smX, smY);
+        const el = document.elementFromPoint(pinchLockX, pinchLockY);
         const interactive = el && el.closest('button, a, .cal-cell, .task-check, .task-item, input, select, textarea, label');
         const dbl = now - lastPinchAt < 700;
         if (!interactive && !dbl && el && el.closest('.fl-card')) {
@@ -283,21 +336,21 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
           return;
         }
       }
-      pinchAction(now);
+      pinchAction(now, pinchLockX, pinchLockY);
     }
 
-    /* ✊ fist over the reactor = grab (beats turbo scroll there) */
+    /* ✊ fist over Ultron = grab (beats turbo scroll there) */
     if (isFist && !grab && overReactor && ny > 0.3 && ny < 0.6) {
       startGrab('fist', lm); lastX = nx; lastT = now; return;
     }
-    /* ✋ open palm resting over the reactor auto-grabs after ~0.25s */
-    if (!isFist && !pinchPose && overReactor && ny > 0.34 && ny < 0.55) {
+    /* ✋ open palm resting over Ultron auto-grabs after ~0.25s */
+    if (!isFist && !pinched && overReactor && entryOk && ny > 0.34 && ny < 0.55) {
       if (++palmHold >= 4 && !grab) { startGrab('palm', lm); lastX = nx; lastT = now; return; }
     } else palmHold = 0;
 
-    /* scrolling: asymmetric zones — the DOWN zone starts just below
-       centre (holding a hand at the bottom edge of a webcam frame
-       loses tracking, so never require it). Quadratic ease, capped.
+    /* scrolling: asymmetric zones with quadratic ease — velocity is
+       PROPORTIONAL to how deep the hand is in the zone, and the
+       animation loop applies exponential decay for a fling feel.
        ✊ fist = turbo (faster, still capped) */
     let zone = 0;
     if (isFist) {
@@ -319,30 +372,65 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
     cursor.classList.toggle('scrollUp', zone < 0);
     cursor.classList.toggle('scrollDn', zone > 0);
 
-    /* fast horizontal swipe → cycle cards / tabs (not while fist) */
-    if (lastX != null && !isFist) {
+    /* fast horizontal swipe → cycle cards / tabs. velocity is computed
+       on the box-mapped, filtered x — noise can't fake a swipe — and
+       the entry guard stops the "hand entering frame" false swipe */
+    if (lastX != null && !isFist && !pinched && entryOk) {
       const vx = (nx - lastX) / Math.max(.001, (now - lastT) / 1000);   // screens/sec
       if (now > swipeCool && Math.abs(vx) > 2.6) { swipeAction(vx > 0 ? 1 : -1); swipeCool = now + 1100; }
     }
     lastX = nx; lastT = now;
   }
 
+  /* adaptive inference loop: measures each hands.send() latency and
+     lets the pacer choose the next interval — fast machines run 30fps,
+     slow ones degrade to ~12fps on FRESH frames instead of queueing */
+  async function tick() {
+    if (!active) return;
+    if (!document.hidden && !busy && video.readyState >= 2) {
+      busy = true;
+      const t0 = performance.now();
+      try { await hands.send({ image: video }); pacer.record(performance.now() - t0); }
+      catch (e) { /* one bad frame — keep going */ }
+      busy = false;
+      /* lighting fallback: hand not found for 6s straight while the
+         camera runs → relax detection confidence once + hint the user */
+      if (!lowLightAdapted && lastHandAt && performance.now() - lastHandAt > 6000) {
+        lowLightAdapted = true;
+        hands.setOptions({ minDetectionConfidence: .4, minTrackingConfidence: .4 });
+        status.textContent = '💡 Hard to see — face a light source';
+      }
+    }
+    loopTimer = setTimeout(tick, pacer.interval);
+  }
+
   async function start() {
     btn.disabled = true; status.textContent = 'Loading hand model…'; hud.classList.add('on');
     try {
       if (!window.Hands) await loadScript(`${MP_HANDS}/hands.min.js`);
-      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } });
+      /* camera ladder: prefer 640×480@30 (better landmark precision —
+         MediaPipe resizes internally so inference cost stays flat),
+         fall back to 320×240, then to whatever the device offers */
+      const tries = [
+        { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, max: 30 }, facingMode: 'user' },
+        { width: 320, height: 240, facingMode: 'user' },
+        true,
+      ];
+      for (const c of tries) {
+        try { stream = await navigator.mediaDevices.getUserMedia({ video: c }); break; }
+        catch (e) { if (e.name === 'NotAllowedError' || c === true) throw e; }
+      }
       video.srcObject = stream; await video.play();
       hands = new Hands({ locateFile: f => `${MP_HANDS}/${f}` });
+      /* modelComplexity 0 = lite model: within ~2% of the full model's
+         landmark quality at a fraction of the cost — the filtering
+         pipeline recovers the difference and the FPS win is huge */
       hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: .5, minTrackingConfidence: .5 });
       hands.onResults(onResults);
       active = true; btn.classList.add('live'); btn.innerHTML = '<span class="gb-dot"></span>✋ Gestures ON';
       status.textContent = 'Show your palm ✋';
-      loopTimer = setInterval(async () => {
-        if (busy || video.readyState < 2) return;
-        busy = true;
-        try { await hands.send({ image: video }); } catch (e) { busy = false; }
-      }, 66);   // ~15fps: smooth + cheap
+      lastHandAt = performance.now(); lowLightAdapted = false;
+      tick();
       scrollRaf = requestAnimationFrame(scrollLoop);
     } catch (err) {
       status.textContent = err.name === 'NotAllowedError' ? 'Camera permission denied' : 'Could not start gestures';
@@ -353,7 +441,7 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
 
   function stop() {
     active = false;
-    loopTimer && clearInterval(loopTimer); loopTimer = null;
+    loopTimer && clearTimeout(loopTimer); loopTimer = null;
     scrollRaf && cancelAnimationFrame(scrollRaf); scrollRaf = null;
     stream && stream.getTracks().forEach(t => t.stop()); stream = null;
     hands && hands.close && hands.close(); hands = null;
@@ -361,8 +449,9 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
     cursor.classList.remove('scrollUp', 'scrollDn', 'lost', 'pinch');
     btn.classList.remove('live'); btn.innerHTML = '<span class="gb-dot"></span>✋ Gesture Control';
     reactorApi.releasePointer(); bg && bg.releasePointer(); setHover(null);
-    lastX = null; pinched = false; scrollVel = 0; lastSeen = 0; pinchCool = 0; lastPinchAt = 0;
+    lastX = null; scrollVel = 0; lastSeen = 0; lastPinchAt = 0; seenFrames = 0;
     twoHand = false; grab = null; palmHold = 0;
+    pointF.reset(); predictor.reset(); pinchGate.reset(); fistGate.reset();
   }
   btn.addEventListener('click', () => active ? stop() : start());
 
