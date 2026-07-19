@@ -27,6 +27,7 @@ async function refreshWeather() {
   const chip = document.getElementById('tsWeather');
   const { icon, label } = wmo(wx.current.code);
   const place = store.get('settings').location.name;
+  chip.classList.remove('skel-chip');
   chip.textContent = `${icon} ${wx.current.temp}°C · ${place}`;
   chip.title = `${label} · humidity ${wx.current.humidity}% · wind ${wx.current.wind} km/h` +
     (wx.source === 'demo' ? ' · DEMO DATA' : '');

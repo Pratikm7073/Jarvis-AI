@@ -11,6 +11,7 @@ import markets from './widgets/markets.js';
 import fitness from './widgets/fitness.js';
 import settings from './widgets/settings.js';
 import { initVoice } from './voice.js';
+import { initPremium } from './premium.js';
 
 const REGISTRY = [tasks, gym, calendar, fitness, news, markets, settings, today];
 const widgets = Object.fromEntries(REGISTRY.map(w => [w.id, w]));
@@ -20,14 +21,24 @@ const gridIds = REGISTRY.filter(w => !w.hidden).map(w => w.id);
 const grid = document.getElementById('grid');
 for (const w of REGISTRY) {
   if (w.hidden) { w.mount(null); continue; }
-  const card = document.createElement('article');
-  card.className = 'widget-card';
-  card.dataset.widget = w.id;
-  card.innerHTML = `
-    <div class="w-head"><span class="w-icon">${w.icon}</span>
-      <span class="w-title">${w.title}</span><span class="w-badge"></span></div>
-    <div class="w-body"></div>`;
-  grid.appendChild(card);
+  // bind to the static shell (rendered pre-JS for zero layout shift);
+  // create one only if the HTML is ever out of sync with the registry
+  let card = grid.querySelector(`.widget-card[data-widget="${w.id}"]`);
+  if (!card) {
+    card = document.createElement('article');
+    card.className = 'widget-card';
+    card.dataset.widget = w.id;
+    card.innerHTML = `
+      <div class="w-head"><span class="w-icon">${w.icon}</span>
+        <span class="w-title">${w.title}</span><span class="w-badge"></span></div>
+      <div class="w-body"></div>`;
+    grid.appendChild(card);
+  }
+  card.tabIndex = 0;
+  card.setAttribute('aria-label', `${w.title} — press Enter to expand`);
+  card.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); focusApi.open(w.id); }
+  });
   w.mount(card.querySelector('.w-body'));
   card.addEventListener('click', e => {
     // plain click opens focus unless an inner control was the target
@@ -54,6 +65,7 @@ export const focusApi = {
     (w.expand || w.mount).call(w, focusBody);
     layer.classList.add('open');
     layer.setAttribute('aria-hidden', 'false');
+    dispatchEvent(new CustomEvent('jarvis:focus-open', { detail: { id } }));
   },
   close() {
     if (!focusId) return;
@@ -65,6 +77,7 @@ export const focusApi = {
     // hand the widget its grid card back
     const body = document.querySelector(`.widget-card[data-widget="${w.id}"] .w-body`);
     if (body) w.mount(body);
+    dispatchEvent(new CustomEvent('jarvis:focus-close', { detail: { id: w.id } }));
   },
   isOpen: () => focusId !== null,
   current: () => focusId,
@@ -91,7 +104,8 @@ addEventListener('keydown', e => { if (e.key === 'Escape') focusApi.close(); });
 
 /* weather chip in the strip opens the hidden weather widget */
 document.getElementById('tsWeather').addEventListener('click', () => focusApi.open('weather'));
-document.getElementById('tsWeather').style.cursor = 'pointer';
+
+initPremium();
 
 /* voice assistant (no CDN dependency — works even offline) */
 const setLine = t => { document.getElementById('reactorLine').textContent = t; };
@@ -129,6 +143,10 @@ function startTypewriter() {
   let li = 0;
   function typeLine() {
     const text = LINES[li % LINES.length]; li++;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      lineEl.textContent = text;   // no typewriter under reduced motion
+      return;
+    }
     let i = 0;
     lineEl.innerHTML = '<span class="ai-caret"></span>';
     const tick = setInterval(() => {

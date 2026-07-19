@@ -14,7 +14,9 @@ async function render() {
     <div class="tab-row" data-tabs="news">
       ${CATS.map(c => `<button class="tab-btn ${c === cat ? 'on' : ''}" data-cat="${c}">${c}</button>`).join('')}
     </div>
-    <div class="news-list"><div class="empty-note">Fetching headlines…</div></div>`;
+    <div class="news-list" aria-busy="true">
+      ${'<div class="skel-news"><div class="skel"></div><div class="skel"></div></div>'.repeat(5)}
+    </div>`;
   root.querySelector('.tab-row').addEventListener('click', e => {
     const b = e.target.closest('[data-cat]');
     if (b && b.dataset.cat !== cat) { cat = b.dataset.cat; render(); }
@@ -24,6 +26,7 @@ async function render() {
   setBadge('news', data.source, data.provider);
   const list = root.querySelector('.news-list');
   if (!list) return;
+  list.removeAttribute('aria-busy');
   list.innerHTML = data.items.map(a => `
     <a class="news-item" ${a.url ? `href="${esc(a.url)}" target="_blank" rel="noopener"` : ''}>
       <div class="n-title">${esc(a.title)}</div>
