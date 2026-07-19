@@ -35,6 +35,7 @@ export function initVoice({ focusApi, widgets, setLine }) {
     calendar: 'calendar', events: 'calendar', news: 'news', headlines: 'news',
     market: 'markets', markets: 'markets', stocks: 'markets', crypto: 'markets',
     fitness: 'fitness', steps: 'fitness', settings: 'settings', weather: 'weather',
+    earth: 'earth', globe: 'earth', map: 'earth', world: 'earth',
   };
 
   async function handle(raw) {

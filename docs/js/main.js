@@ -9,11 +9,12 @@ import calendar from './widgets/calendar.js';
 import news from './widgets/news.js';
 import markets from './widgets/markets.js';
 import fitness from './widgets/fitness.js';
+import earth from './widgets/earth.js';
 import settings from './widgets/settings.js';
 import { initVoice } from './voice.js';
 import { initPremium } from './premium.js';
 
-const REGISTRY = [tasks, gym, calendar, fitness, news, markets, settings, today];
+const REGISTRY = [tasks, gym, calendar, fitness, news, markets, earth, settings, today];
 const widgets = Object.fromEntries(REGISTRY.map(w => [w.id, w]));
 const gridIds = REGISTRY.filter(w => !w.hidden).map(w => w.id);
 
@@ -61,6 +62,16 @@ export const focusApi = {
     focusId = id;
     document.getElementById('focusIcon').textContent = w.icon;
     document.getElementById('focusTitle').textContent = w.title;
+    /* the dialog wears the widget's accent color */
+    const srcCard = document.querySelector(`.widget-card[data-widget="${id}"]`);
+    if (srcCard) {
+      const cs = getComputedStyle(srcCard);
+      focusCard.style.setProperty('--ac', cs.getPropertyValue('--ac'));
+      focusCard.style.setProperty('--acr', cs.getPropertyValue('--acr'));
+    } else {
+      focusCard.style.removeProperty('--ac');   // hidden widgets (weather) → default cyan
+      focusCard.style.removeProperty('--acr');
+    }
     focusBody.innerHTML = '';
     (w.expand || w.mount).call(w, focusBody);
     layer.classList.add('open');
