@@ -8,9 +8,11 @@ import gym from './widgets/gym.js';
 import calendar from './widgets/calendar.js';
 import news from './widgets/news.js';
 import markets from './widgets/markets.js';
+import fitness from './widgets/fitness.js';
 import settings from './widgets/settings.js';
+import { initVoice } from './voice.js';
 
-const REGISTRY = [tasks, gym, calendar, news, markets, settings, today];
+const REGISTRY = [tasks, gym, calendar, fitness, news, markets, settings, today];
 const widgets = Object.fromEntries(REGISTRY.map(w => [w.id, w]));
 const gridIds = REGISTRY.filter(w => !w.hidden).map(w => w.id);
 
@@ -90,6 +92,17 @@ addEventListener('keydown', e => { if (e.key === 'Escape') focusApi.close(); });
 /* weather chip in the strip opens the hidden weather widget */
 document.getElementById('tsWeather').addEventListener('click', () => focusApi.open('weather'));
 document.getElementById('tsWeather').style.cursor = 'pointer';
+
+/* voice assistant (no CDN dependency — works even offline) */
+const setLine = t => { document.getElementById('reactorLine').textContent = t; };
+initVoice({ focusApi, widgets, setLine });
+
+/* installable app shell — register only where it should persist
+   (HTTPS/Pages, or opt-in locally with ?pwa=1) */
+if ('serviceWorker' in navigator &&
+    (location.protocol === 'https:' || new URLSearchParams(location.search).has('pwa'))) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('sw register failed', e));
+}
 
 /* ── refresh scheduler (paused while tab is hidden) ── */
 for (const w of REGISTRY) {

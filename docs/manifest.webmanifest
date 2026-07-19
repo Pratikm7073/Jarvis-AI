@@ -1,0 +1,14 @@
+{
+  "name": "J.A.R.V.I.S. Dashboard",
+  "short_name": "JARVIS",
+  "description": "Gesture + voice controlled personal daily dashboard: tasks, gym, calendar, news, markets, fitness.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050507",
+  "theme_color": "#050507",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
