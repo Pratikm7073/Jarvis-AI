@@ -9,11 +9,12 @@ import calendar from './widgets/calendar.js';
 import news from './widgets/news.js';
 import markets from './widgets/markets.js';
 import fitness from './widgets/fitness.js';
+import earth from './widgets/earth.js';
 import settings from './widgets/settings.js';
 import { initVoice } from './voice.js';
 import { initPremium } from './premium.js';
 
-const REGISTRY = [tasks, gym, calendar, fitness, news, markets, settings, today];
+const REGISTRY = [tasks, gym, calendar, fitness, news, markets, earth, settings, today];
 const widgets = Object.fromEntries(REGISTRY.map(w => [w.id, w]));
 const gridIds = REGISTRY.filter(w => !w.hidden).map(w => w.id);
 

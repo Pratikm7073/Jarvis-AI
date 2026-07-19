@@ -59,6 +59,10 @@ Click the **🎙 JARVIS** chip in the header and allow the microphone. Then just
 
 Replies are spoken aloud and typed on the status line under Ultron.
 
+### Earth — your holographic Snap-Map
+
+The **🌍 Earth** widget is a real-textured 3D globe (NASA imagery) floating in the dashboard's starfield, wrapped in a cyan holo-graticule and atmosphere. Hit **📍 Fly to me** — it asks for your location (falls back to your saved city) and cinematically rotates the planet to land on you. As you descend, a dark holo-styled **street map of your actual neighbourhood** (free OpenStreetMap tiles, recolored to the theme) materialises as a circular projection, with a glowing **hologram avatar** standing at your position under a "YOURNAME · LIVE" tag. Drag to spin, scroll/pinch to zoom, double-click to fly home, **Full view** to zoom back out. No API keys; if the CDN is unreachable the globe renders as a pure wireframe hologram.
+
 ### Fitness — steps & heart rate (and the Apple Health truth)
 
 **Apple Fitness/Health has no public web API** — Apple only exposes HealthKit to native iOS apps, so no website (this one included) can read it directly. Instead the Fitness widget gives you three real paths:
