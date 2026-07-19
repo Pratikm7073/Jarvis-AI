@@ -96,7 +96,7 @@ function ring(steps, goal) {
   const R = 52, C = 2 * Math.PI * R;
   return `<svg class="fit-ring" viewBox="0 0 120 120">
     <circle cx="60" cy="60" r="${R}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="9"/>
-    <circle cx="60" cy="60" r="${R}" fill="none" stroke="${pct >= 1 ? 'var(--lime)' : 'var(--cyan)'}" stroke-width="9"
+    <circle cx="60" cy="60" r="${R}" fill="none" stroke="${pct >= 1 ? 'var(--lime)' : 'var(--ac)'}" stroke-width="9"
       stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}"
       transform="rotate(-90 60 60)"/>
     <text x="60" y="56" text-anchor="middle" class="fit-ring-n">${steps.toLocaleString()}</text>

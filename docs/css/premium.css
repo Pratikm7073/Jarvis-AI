@@ -22,7 +22,7 @@
 
 /* ── focus-visible rings everywhere (keyboard users get
       the same premium feedback pointer users get) ── */
-:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:6px}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:6px}
 .widget-card:focus-visible{outline-offset:-2px}
 
 /* ── magnetic buttons: JS drives transform while hovered
@@ -42,7 +42,7 @@ button:not(:disabled):active{transform:scale(.97)}
       premium.js (rAF-batched), light follows the pointer
       AND the hand-tracking cursor ── */
 .widget-card{--mx:50%;--my:50%}
-.widget-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(340px circle at var(--mx) var(--my),rgba(92,225,230,.075),transparent 65%);opacity:0;transition:opacity .4s;pointer-events:none;z-index:0}
+.widget-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(340px circle at var(--mx) var(--my),rgba(var(--acr),.1),transparent 65%);opacity:0;transition:opacity .4s;pointer-events:none;z-index:0}
 .widget-card:hover::before,.widget-card.g-hover::before{opacity:1}
 .widget-card>*{position:relative;z-index:1}
 

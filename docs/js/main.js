@@ -62,6 +62,16 @@ export const focusApi = {
     focusId = id;
     document.getElementById('focusIcon').textContent = w.icon;
     document.getElementById('focusTitle').textContent = w.title;
+    /* the dialog wears the widget's accent color */
+    const srcCard = document.querySelector(`.widget-card[data-widget="${id}"]`);
+    if (srcCard) {
+      const cs = getComputedStyle(srcCard);
+      focusCard.style.setProperty('--ac', cs.getPropertyValue('--ac'));
+      focusCard.style.setProperty('--acr', cs.getPropertyValue('--acr'));
+    } else {
+      focusCard.style.removeProperty('--ac');   // hidden widgets (weather) → default cyan
+      focusCard.style.removeProperty('--acr');
+    }
     focusBody.innerHTML = '';
     (w.expand || w.mount).call(w, focusBody);
     layer.classList.add('open');
