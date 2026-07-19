@@ -1,0 +1,96 @@
+/* ════════════════════════════════════════════════════
+   PREMIUM LAYER — restraint-first polish
+   ambient light · magnetic buttons · card spotlight ·
+   cinematic entrance · skeletons · focus depth · a11y
+   All motion is transform/opacity only (compositor-only
+   → 60fps); everything defers to prefers-reduced-motion.
+════════════════════════════════════════════════════ */
+
+/* ── ambient mesh light: two blurred glows between the
+      WebGL space layer and the content. Barely there —
+      they warm the glass, they don't perform. ── */
+.mesh{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.mesh::before,.mesh::after{content:'';position:absolute;width:60vmax;height:60vmax;border-radius:50%;filter:blur(90px);opacity:.055;will-change:transform}
+.mesh::before{left:-18vmax;top:-20vmax;background:radial-gradient(circle,var(--cyan),transparent 65%);animation:meshDriftA 64s ease-in-out infinite alternate}
+.mesh::after{right:-20vmax;bottom:-22vmax;background:radial-gradient(circle,var(--violet),transparent 65%);animation:meshDriftB 76s ease-in-out infinite alternate}
+@keyframes meshDriftA{to{transform:translate(6vmax,4vmax)}}
+@keyframes meshDriftB{to{transform:translate(-5vmax,-6vmax)}}
+
+/* ── skip link: invisible until keyboard-focused ── */
+.skip-link{position:fixed;top:10px;left:10px;z-index:9990;font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--cyan);padding:10px 16px;border-radius:12px;text-decoration:none;font-weight:600;transform:translateY(-300%);transition:transform .25s var(--ease)}
+.skip-link:focus-visible{transform:translateY(0)}
+
+/* ── focus-visible rings everywhere (keyboard users get
+      the same premium feedback pointer users get) ── */
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:6px}
+.widget-card:focus-visible{outline-offset:-2px}
+
+/* ── magnetic buttons: JS drives transform while hovered
+      (.mag-live kills the transition for 1:1 tracking),
+      the spring-back on leave is pure CSS ── */
+.magnetic{transition:transform .45s cubic-bezier(.22,1.2,.3,1)}
+.magnetic.mag-live{transition:none}
+button:not(:disabled):active{transform:scale(.97)}
+
+/* ── primary button shine: one subtle sweep on hover ── */
+.pill-btn.solid{position:relative;overflow:hidden}
+.pill-btn.solid::after{content:'';position:absolute;top:0;bottom:0;left:-70%;width:45%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg);opacity:0}
+.pill-btn.solid:hover::after{animation:shine .7s var(--ease) 1}
+@keyframes shine{from{left:-70%;opacity:1}to{left:130%;opacity:0}}
+
+/* ── cursor-reactive card spotlight: --mx/--my updated by
+      premium.js (rAF-batched), light follows the pointer
+      AND the hand-tracking cursor ── */
+.widget-card{--mx:50%;--my:50%}
+.widget-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(340px circle at var(--mx) var(--my),rgba(92,225,230,.075),transparent 65%);opacity:0;transition:opacity .4s;pointer-events:none;z-index:0}
+.widget-card:hover::before,.widget-card.g-hover::before{opacity:1}
+.widget-card>*{position:relative;z-index:1}
+
+/* ── cinematic entrance: hidden states exist ONLY when JS
+      has marked the page ready (progressive enhancement —
+      no JS, no hiding) and motion is allowed ── */
+@media (prefers-reduced-motion: no-preference){
+  html.pv-ready #todayStrip{opacity:0;transform:translateY(-14px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+  html.pv-ready #reactorStage{opacity:0;transition:opacity 1.1s var(--ease)}
+  html.pv-ready .widget-card{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease),transform .7s var(--ease),border-color .3s,box-shadow .3s}
+  html.pv-ready footer{opacity:0;transition:opacity .8s var(--ease)}
+  html.pv-ready .pv-in{opacity:1 !important;transform:none !important}
+}
+
+/* ── focus-mode depth: the page physically recedes behind
+      the dialog (transform/opacity only) ── */
+#grid,#reactorStage{transition:transform .5s var(--ease),opacity .5s var(--ease)}
+body.focus-open #grid{transform:scale(.985);opacity:.55}
+body.focus-open #reactorStage{opacity:.45}
+
+/* ── loading skeletons: fixed heights → zero layout shift
+      when real content lands ── */
+.skel{position:relative;overflow:hidden;background:rgba(255,255,255,.055);border-radius:8px}
+.skel::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.09) 50%,transparent 70%);animation:skelSweep 1.4s linear infinite}
+@keyframes skelSweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.skel-news{padding:10px 4px;border-bottom:1px solid rgba(255,255,255,.05)}
+.skel-news .skel:first-child{height:14px;width:88%;margin-bottom:8px}
+.skel-news .skel:last-child{height:9px;width:38%}
+.skel-mkt{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid rgba(255,255,255,.05)}
+.skel-mkt .skel:nth-child(1){height:12px;width:74px}
+.skel-mkt .skel:nth-child(2){height:10px;flex:1}
+.skel-mkt .skel:nth-child(3){height:12px;width:72px}
+.ts-chip.skel-chip{color:transparent;background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);min-width:110px;position:relative;overflow:hidden}
+.ts-chip.skel-chip::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.08) 50%,transparent 70%);animation:skelSweep 1.4s linear infinite}
+
+/* ── typographic refinement ── */
+.w-title,.fl-title{text-wrap:balance}
+.news-item .n-title,.gym-today .gt-title{text-wrap:balance}
+#tsClock,.mkt-px,.mkt-chg,.fit-hr-val,.fit-ring-n,.cal-cell,.task-meta,.w-badge{font-variant-numeric:tabular-nums}
+.w-badge{min-width:52px;text-align:center}
+
+/* ── restraint under reduced motion: no shimmer, no mesh
+      drift, no caret blink, no entrance choreography ── */
+@media (prefers-reduced-motion: reduce){
+  .mesh::before,.mesh::after,.skel::after,.ts-chip.skel-chip::after{animation:none}
+  .ai-caret{animation:none}
+  .magnetic{transition:none}
+  #grid,#reactorStage{transition:none}
+  .widget-card::before{transition:none}
+  *,*::before,*::after{scroll-behavior:auto !important}
+}

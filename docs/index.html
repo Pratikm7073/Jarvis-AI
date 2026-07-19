@@ -16,10 +16,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..700&family=Geist+Mono:wght@300..600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./css/base.css">
 <link rel="stylesheet" href="./css/gestures.css">
+<link rel="stylesheet" href="./css/premium.css">
 </head>
 <body>
 
+<a class="skip-link" href="#grid">Skip to dashboard</a>
 <div class="bg-layer"><canvas id="bg3d"></canvas></div>
+<div class="mesh" aria-hidden="true"></div>
 <div class="grain"></div>
 <div class="vignette"></div>
 
@@ -31,8 +34,8 @@
   </div>
   <div class="ts-mid" id="tsGreeting">Initializing…</div>
   <div class="ts-right">
-    <button id="voiceBtn" class="ts-chip mic" title="Talk to J.A.R.V.I.S.">🎙 JARVIS</button>
-    <span id="tsWeather" class="ts-chip" title="Weather">—</span>
+    <button id="voiceBtn" class="ts-chip mic" title="Talk to J.A.R.V.I.S." aria-label="Toggle voice assistant" aria-pressed="false">🎙 JARVIS</button>
+    <button id="tsWeather" class="ts-chip skel-chip" title="Weather" aria-label="Open weather forecast">—</button>
     <span id="tsStatus" class="ts-chip ok">SYSTEMS NOMINAL</span>
   </div>
 </header>
@@ -43,8 +46,19 @@
   <div id="reactorLine">ULTRON CORE ONLINE<span class="ai-caret"></span></div>
 </section>
 
-<!-- ─── WIDGET GRID (cards injected by main.js) ─────── -->
-<main id="grid" aria-label="Dashboard widgets"></main>
+<!-- ─── WIDGET GRID ───────────────────────────────────
+     static shells render before any JS runs (zero layout
+     shift, instant perceived structure); main.js binds
+     behavior and fills the bodies ─────────────────────── -->
+<main id="grid" aria-label="Dashboard widgets">
+  <article class="widget-card" data-widget="tasks"><div class="w-head"><span class="w-icon">☑️</span><span class="w-title">Tasks</span><span class="w-badge"></span></div><div class="w-body"></div></article>
+  <article class="widget-card" data-widget="gym"><div class="w-head"><span class="w-icon">🏋️</span><span class="w-title">Gym Plan</span><span class="w-badge"></span></div><div class="w-body"></div></article>
+  <article class="widget-card" data-widget="calendar"><div class="w-head"><span class="w-icon">📅</span><span class="w-title">Calendar</span><span class="w-badge"></span></div><div class="w-body"></div></article>
+  <article class="widget-card" data-widget="fitness"><div class="w-head"><span class="w-icon">🏃</span><span class="w-title">Fitness</span><span class="w-badge"></span></div><div class="w-body"></div></article>
+  <article class="widget-card" data-widget="news"><div class="w-head"><span class="w-icon">📰</span><span class="w-title">Today's News</span><span class="w-badge"></span></div><div class="w-body"></div></article>
+  <article class="widget-card" data-widget="markets"><div class="w-head"><span class="w-icon">📈</span><span class="w-title">Markets</span><span class="w-badge"></span></div><div class="w-body"></div></article>
+  <article class="widget-card" data-widget="settings"><div class="w-head"><span class="w-icon">⚙️</span><span class="w-title">Settings</span><span class="w-badge"></span></div><div class="w-body"></div></article>
+</main>
 
 <footer>
   <span>© 2026 Pratik More</span>
@@ -54,8 +68,8 @@
 <!-- ─── FOCUS MODE OVERLAY ──────────────────────────── -->
 <div id="focusLayer" aria-hidden="true">
   <div class="fl-backdrop"></div>
-  <div class="fl-card" id="focusCard">
-    <button class="fl-close" id="focusClose" aria-label="Close">×</button>
+  <div class="fl-card" id="focusCard" role="dialog" aria-modal="true" aria-labelledby="focusTitle">
+    <button class="fl-close" id="focusClose" aria-label="Close dialog">×</button>
     <div class="fl-head"><span class="fl-icon" id="focusIcon"></span><span class="fl-title" id="focusTitle"></span></div>
     <div class="fl-body" id="focusBody"></div>
   </div>

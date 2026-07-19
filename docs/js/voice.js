@@ -107,6 +107,7 @@ export function initVoice({ focusApi, widgets, setLine }) {
     rec.start();
     active = true;
     btn.classList.add('live');
+    btn.setAttribute('aria-pressed', 'true');
     setLine('🎙 Listening — say “open calendar”, “add task…”, “what’s my workout”');
   }
   function stop() {
@@ -114,6 +115,7 @@ export function initVoice({ focusApi, widgets, setLine }) {
     rec && (rec.onend = null, rec.stop()); rec = null;
     speechSynthesis.cancel();
     btn.classList.remove('live');
+    btn.setAttribute('aria-pressed', 'false');
     setLine('Voice off.');
   }
   btn.addEventListener('click', () => active ? stop() : start());

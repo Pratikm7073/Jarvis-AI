@@ -100,6 +100,10 @@ Each widget shows where its data came from: `LIVE · <provider>`, `PROXY · <ETF
 - Camera frames are processed **entirely in your browser** by MediaPipe Hands — no image ever leaves your machine.
 - Tasks, gym log, calendar events, settings and keys live in **localStorage** on your device. No backend, no accounts, no analytics.
 
+### Design system
+
+The UI follows a premium-SaaS bar (Linear/Stripe/Vercel-style): a fluid type scale with tabular numerals, restrained glassmorphism over ambient mesh lighting, magnetic buttons and cursor-reactive card spotlights, an orchestrated staggered entrance, and shimmer skeletons for every loading state. All motion is transform/opacity-only (60 fps), fully disabled under `prefers-reduced-motion`. Accessibility is WCAG AA: visible focus rings, a skip link, keyboard-operable cards, and the expanded widget is a real `role="dialog"` with focus trapping that returns focus on close. Measured CLS is ~0.000 — the widget grid is server-rendered as static shells with fixed card heights, so nothing on the page ever reflows while data loads.
+
 ### Under the hood
 
 Hand-authored ES modules, no build step. Three.js (pinned `0.160.0`) renders the Ultron head and the nebula/starfield/supernova background (a domain-warped fbm shader running at 30 fps at reduced resolution); MediaPipe Hands (pinned, lazy-loaded only when you enable gestures) does the tracking on a 640×480 feed with a 320×240 fallback. If the CDN is unreachable the 3D/gesture layer switches off and the dashboard keeps working with mouse/touch.

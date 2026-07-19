@@ -15,7 +15,9 @@ async function render() {
     <div class="tab-row" data-tabs="markets">
       ${TABS.map(([k, label]) => `<button class="tab-btn ${k === market ? 'on' : ''}" data-mkt="${k}">${label}</button>`).join('')}
     </div>
-    <div class="mkt-list"><div class="empty-note">Fetching quotes…</div></div>`;
+    <div class="mkt-list" aria-busy="true">
+      ${'<div class="skel-mkt"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>'.repeat(5)}
+    </div>`;
   root.querySelector('.tab-row').addEventListener('click', e => {
     const b = e.target.closest('[data-mkt]');
     if (b && b.dataset.mkt !== market) { market = b.dataset.mkt; render(); }
@@ -25,6 +27,7 @@ async function render() {
   setBadge('markets', data.source, data.provider);
   const list = root.querySelector('.mkt-list');
   if (!list) return;
+  list.removeAttribute('aria-busy');
   const ccy = CCY[market];
   list.innerHTML = data.rows.map(r => `
     <div class="mkt-row">
