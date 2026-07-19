@@ -9,8 +9,14 @@
 #gestureHud.on{opacity:1;transform:translateY(0);pointer-events:auto}
 #gestureHud video{width:100%;height:140px;object-fit:cover;transform:scaleX(-1);display:block;background:#000}
 #gestureHud .g-status{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--cyan);letter-spacing:.06em;padding:10px 14px 4px;text-transform:uppercase}
-#gestureHud .g-help{font-family:'Geist Mono',monospace;font-size:10px;color:#999;line-height:1.7;padding:2px 14px 10px}
+#gestureHud .g-help{font-family:'Geist Mono',monospace;font-size:10px;color:#999;line-height:1.7;padding:2px 14px 6px}
 #gestureHud .g-help b{color:#ddd;font-weight:500}
+#gestureHud .g-more{padding:0 14px 8px;font-family:'Geist Mono',monospace}
+#gestureHud .g-more summary{font-size:9.5px;color:var(--cyan);cursor:pointer;letter-spacing:.06em;list-style:none}
+#gestureHud .g-more summary::before{content:'▸ ';font-size:9px}
+#gestureHud .g-more[open] summary::before{content:'▾ '}
+#gestureHud .g-more div{font-size:9.5px;color:#999;line-height:1.7;padding-top:5px}
+#gestureHud .g-more div b{color:#ddd;font-weight:500}
 #gestureHud .g-priv{font-family:'Geist Mono',monospace;font-size:9px;color:#666;padding:0 14px 12px;letter-spacing:.04em}
 #handCursor{position:fixed;left:0;top:0;z-index:9500;width:42px;height:42px;margin:-21px 0 0 -21px;pointer-events:none;display:none;transition:opacity .25s}
 #handCursor .hc-ring{position:absolute;inset:0;border:2px solid var(--cyan);border-radius:50%;box-shadow:0 0 18px rgba(92,225,230,.6),inset 0 0 10px rgba(92,225,230,.3);transition:transform .12s,border-color .12s}

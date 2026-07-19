@@ -42,6 +42,43 @@ Click **✋ Gesture Control** (bottom-right) and allow the camera. Then:
 
 Tips: keep your hand ~50–80 cm from the camera in decent light. If tracking drops for a moment the cursor dims instead of vanishing — just keep going. Add `?debug=1` to the URL to drive the same actions from the keyboard (mouse = cursor, `P` = pinch, `[` `]` = swipe, `Shift+↑/↓` = scroll).
 
+### Talk to it — J.A.R.V.I.S. voice assistant
+
+Click the **🎙 JARVIS** chip in the header and allow the microphone. Then just speak (Chrome/Edge have the best speech support):
+
+| Say | It does |
+|---|---|
+| "open calendar" / "show markets" / "open fitness" | opens that widget fullscreen |
+| "close" | closes the open widget |
+| "add task buy protein" / "remind me to call mom" | adds a task and confirms out loud |
+| "what's my workout" | speaks today's gym plan |
+| "weather" | speaks the current conditions |
+| "what time is it" / "what's the date" | speaks it |
+| "how many steps" / "heart rate" | speaks your fitness numbers |
+| "gestures on" / "next tab" / "scroll down" | drives the UI hands-free |
+
+Replies are spoken aloud and typed on the status line under Ultron.
+
+### Fitness — steps & heart rate (and the Apple Health truth)
+
+**Apple Fitness/Health has no public web API** — Apple only exposes HealthKit to native iOS apps, so no website (this one included) can read it directly. Instead the Fitness widget gives you three real paths:
+
+1. **Built-in step counter** — tap **👣 count my steps** on your phone: it uses the accelerometer (DeviceMotion) with peak detection to count steps in real time while the page is open. iOS will ask permission once.
+2. **Live heart rate** — tap **💓 connect HR monitor** to pair any Bluetooth LE heart-rate device (chest straps, most sport watches in broadcast mode) via Web Bluetooth. Works in Chrome/Edge on desktop & Android; iPhone browsers block Web Bluetooth.
+3. **Manual sync** — type the step count from your Apple Health app into the widget; it's stored with the rest of your data. (Power-user route: an iPhone *Shortcuts* automation can read Health data on a schedule — pair it with a native wrapper app later for true auto-sync.)
+
+Progress shows as a goal ring (default 8,000 steps/day) and history is kept for 90 days in localStorage.
+
+### Install it as an app
+
+The dashboard is a PWA — once it's on GitHub Pages you can install it:
+
+- **Desktop Chrome/Edge:** open the site → click the ⊕ **Install** icon at the right end of the address bar.
+- **Android Chrome:** menu ⋮ → **Add to Home screen** → **Install**.
+- **iPhone Safari:** Share button → **Add to Home Screen**.
+
+It launches fullscreen with its own Ultron icon, and the app shell loads instantly (cached offline; live data still needs internet).
+
 ### Live data (optional API keys)
 
 Everything works instantly with **demo data** (badged `DEMO`). Weather and crypto are live out of the box — no keys. For the rest, paste free-tier keys into **Settings** on the dashboard:
@@ -65,21 +102,29 @@ Each widget shows where its data came from: `LIVE · <provider>`, `PROXY · <ETF
 
 ### Under the hood
 
-Hand-authored ES modules, no build step. Three.js (pinned `0.160.0`) renders the Ultron head and the nebula/starfield/supernova background (a domain-warped fbm shader running at 30 fps at reduced resolution); MediaPipe Hands (pinned, lazy-loaded only when you enable gestures) does the tracking at ~15 fps on a 320×240 feed. If the CDN is unreachable the 3D/gesture layer switches off and the dashboard keeps working with mouse/touch.
+Hand-authored ES modules, no build step. Three.js (pinned `0.160.0`) renders the Ultron head and the nebula/starfield/supernova background (a domain-warped fbm shader running at 30 fps at reduced resolution); MediaPipe Hands (pinned, lazy-loaded only when you enable gestures) does the tracking on a 640×480 feed with a 320×240 fallback. If the CDN is unreachable the 3D/gesture layer switches off and the dashboard keeps working with mouse/touch.
+
+The gesture tracking runs a production-grade signal pipeline (`js/gesture-core.js`, fully unit-tested): **One Euro filtering** (adaptive smoothing — kills cursor jitter with no perceptible lag), a micro-**deadzone**, **hysteresis gates** with frame debounce and cooldowns (no accidental or double-fired pinches), **automatic per-user calibration** of pinch thresholds (hand-size and camera-distance invariant), **motion prediction** that bridges tracking dropouts invisibly, MediaPipe-**confidence gating**, an **interaction box** so screen corners are reachable without stretching to the frame edge, and an **adaptive FPS pacer** that holds real-time on any machine (30 fps on fast hardware, graceful degradation under load, low-light auto-relaxation of detection thresholds).
 
 ```
 docs/
 ├── index.html            shell + importmap
+├── manifest.webmanifest  PWA manifest (installable app)
+├── sw.js                 service worker (offline app shell)
+├── icon.svg              app icon
 ├── css/                  base.css · gestures.css
 └── js/
     ├── main.js           widget registry · focus mode · scheduler
     ├── reactor.js        Three.js Ultron head centerpiece
     ├── background.js     deep-space nebula + starfield + supernova
-    ├── gestures.js       MediaPipe hand-tracking engine
+    ├── gestures.js       MediaPipe hand-tracking engine (UI layer)
+    ├── gesture-core.js   signal pipeline: One Euro · hysteresis gates ·
+    │                     calibration · prediction · adaptive pacing
+    ├── voice.js          Web Speech voice assistant
     ├── api.js            provider chains + fallbacks
     ├── store.js          localStorage + TTL cache
     ├── demo-data.js      offline demo values
-    └── widgets/          today · tasks · gym · calendar · news · markets · settings
+    └── widgets/          today · tasks · gym · calendar · fitness · news · markets · settings
 ```
 
 ---

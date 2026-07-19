@@ -5,7 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>J.A.R.V.I.S. — Daily Dashboard</title>
 <meta name="description" content="Gesture-controlled personal daily dashboard: tasks, gym, calendar, news, markets.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='38' fill='none' stroke='%235ce1e6' stroke-width='8'/><circle cx='50' cy='50' r='14' fill='%235ce1e6'/></svg>">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="theme-color" content="#050507">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..700&family=Geist+Mono:wght@300..600&display=swap" rel="stylesheet">
@@ -26,6 +31,7 @@
   </div>
   <div class="ts-mid" id="tsGreeting">Initializing…</div>
   <div class="ts-right">
+    <button id="voiceBtn" class="ts-chip mic" title="Talk to J.A.R.V.I.S.">🎙 JARVIS</button>
     <span id="tsWeather" class="ts-chip" title="Weather">—</span>
     <span id="tsStatus" class="ts-chip ok">SYSTEMS NOMINAL</span>
   </div>
@@ -60,7 +66,10 @@
 <div id="gestureHud">
   <video id="gestureCam" playsinline muted></video>
   <div class="g-status" id="gStatus">Starting camera…</div>
-  <div class="g-help"><b>✋ Move</b> cursor · <b>hand high/low</b> scroll · <b>✊ fist</b> turbo · <b>🤏 pinch a card</b> open it · <b>🤏 pinch ×2</b> close · <b>swipe fast</b> next widget / tab · <b>🔒 grab Ultron's head</b> (pinch-hold / palm / fist over it) then rotate your wrist · <b>🙌 both hands</b> drag = rotate · apart/together = zoom</div>
+  <div class="g-help">✋ move · 🤏 pinch = open · ✊ scroll</div>
+  <details class="g-more"><summary>all gestures</summary>
+    <div><b>✋ move</b> cursor · <b>hand high/low</b> scroll · <b>✊ fist</b> turbo scroll · <b>🤏 pinch a card</b> open it · <b>🤏 pinch ×2</b> close · <b>fast swipe</b> next widget / tab · <b>🔒 grab Ultron's head</b> (pinch-hold / palm / fist over it) then rotate your wrist · <b>🙌 both hands</b> drag = rotate · apart/together = zoom</div>
+  </details>
   <div class="g-priv">⛨ runs 100% in your browser — nothing is uploaded</div>
 </div>
 <div id="handCursor"><div class="hc-ring"></div><div class="hc-core"></div><div class="hc-pulse"></div><div class="hc-arr u">▲</div><div class="hc-arr d">▼</div></div>

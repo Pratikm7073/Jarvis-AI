@@ -25,6 +25,11 @@ const DEFAULTS = {
     doneLog: {},      // { "2026-07-18": true }
   },
   calendar: { events: [] },   // [ {id, date:'2026-07-21', time:'18:30', title} ]
+  fitness: {
+    goal: 8000,               // daily step goal
+    steps: {},                // { "2026-07-18": 4231 }
+    hr: { last: null, at: null },
+  },
   watchlist: {
     us:     ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'GOOGL'],
     in:     ['NIFTY 50', 'SENSEX'],
