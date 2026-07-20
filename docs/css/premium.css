@@ -16,6 +16,42 @@
 @keyframes meshDriftA{to{transform:translate(6vmax,4vmax)}}
 @keyframes meshDriftB{to{transform:translate(-5vmax,-6vmax)}}
 
+/* ── aurora breathing frame (ref B1): a soft rainbow glow
+      hugging the viewport edges; swells while Jarvis listens ── */
+/* static gradient painted ONCE; hue-rotate + opacity animate on the
+   compositor (no per-frame repaint of a giant blurred layer) */
+.aurora{position:fixed;inset:0;z-index:1997;pointer-events:none;padding:64px;
+  background:conic-gradient(from 0deg,#5ce1e6,#8b6dff,#e0457b,#ffc45c,#4dd6a9,#5ce1e6);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;
+  will-change:filter,opacity;
+  /* steps(): the blurred rainbow re-rasterizes ~2x/sec instead of 60x —
+     invisible through 46px of blur, an order of magnitude cheaper */
+  animation:auroraHue 26s steps(52) infinite,auroraBreathe 7s ease-in-out infinite alternate}
+@keyframes auroraHue{from{filter:blur(46px) saturate(1.2) hue-rotate(0deg)}to{filter:blur(46px) saturate(1.2) hue-rotate(360deg)}}
+@keyframes auroraBreathe{from{opacity:.07}to{opacity:.15}}
+body.jarvis-listening .aurora{animation-duration:9s,2.2s}
+
+/* ── hover crop-marks (ref B3/A4): viewfinder corners that
+      draw themselves around the hovered card ── */
+#hoverMarks{position:absolute;z-index:9250;pointer-events:none;opacity:0;transition:opacity .25s}
+#hoverMarks.on{opacity:1}
+#hoverMarks i{position:absolute;width:16px;height:16px;border:0 solid currentColor;filter:drop-shadow(0 0 6px currentColor)}
+#hoverMarks i:nth-child(1){left:0;top:0;border-left-width:2px;border-top-width:2px}
+#hoverMarks i:nth-child(2){right:0;top:0;border-right-width:2px;border-top-width:2px}
+#hoverMarks i:nth-child(3){left:0;bottom:0;border-left-width:2px;border-bottom-width:2px}
+#hoverMarks i:nth-child(4){right:0;bottom:0;border-right-width:2px;border-bottom-width:2px}
+#hoverMarks.draw i{animation:markDraw .32s var(--ease) backwards}
+#hoverMarks.draw i:nth-child(2){animation-delay:.05s}
+#hoverMarks.draw i:nth-child(3){animation-delay:.08s}
+#hoverMarks.draw i:nth-child(4){animation-delay:.12s}
+@keyframes markDraw{from{transform:scale(.4) translate(6px,6px);opacity:0}}
+
+/* ── odometer digit rolls ── */
+.od{display:inline-flex;height:1em;overflow:hidden;vertical-align:baseline}
+.od-roll{display:flex;flex-direction:column;line-height:1em;transition:transform .5s var(--ease);will-change:transform}
+.od-roll span{height:1em}
+
 /* ── skip link: invisible until keyboard-focused ── */
 .skip-link{position:fixed;top:10px;left:10px;z-index:9990;font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--cyan);padding:10px 16px;border-radius:12px;text-decoration:none;font-weight:600;transform:translateY(-300%);transition:transform .25s var(--ease)}
 .skip-link:focus-visible{transform:translateY(0)}
@@ -112,6 +148,9 @@ body.console-on #consoleRing{opacity:1}
       drift, no caret blink, no entrance choreography ── */
 @media (prefers-reduced-motion: reduce){
   .mesh::before,.mesh::after,.skel::after,.ts-chip.skel-chip::after{animation:none}
+  .aurora{animation:none;opacity:.06}
+  #hoverMarks{display:none}
+  .od-roll{transition:none}
   .ai-caret{animation:none}
   .magnetic{transition:none}
   #grid,#reactorStage{transition:none}

@@ -3,6 +3,7 @@
 ════════════════════════════════════════════════════ */
 import { getQuotes } from '../api.js';
 import { esc, setBadge, fmtPrice, fmtChg, sparkSVG } from '../ui.js';
+import { odometer } from '../fx.js';
 
 const TABS = [['in', '🇮🇳 India'], ['us', '🇺🇸 US'], ['uk', '🇬🇧 UK'], ['crypto', '🪙 Crypto']];
 const CCY = { in: '₹', us: '$', uk: '£', crypto: '$' };
@@ -29,6 +30,12 @@ async function render() {
   if (!list) return;
   list.removeAttribute('aria-busy');
   const ccy = CCY[market];
+  /* remember old prices so refreshed digits ROLL instead of swap */
+  const prevPx = {};
+  list.querySelectorAll('.mkt-row').forEach(row => {
+    const s = row.querySelector('.mkt-sym')?.textContent;
+    if (s) prevPx[s] = row.querySelector('.mkt-px')?.textContent;
+  });
   list.innerHTML = data.rows.map(r => `
     <div class="mkt-row">
       <span class="mkt-sym">${esc(r.sym)}</span>
@@ -42,6 +49,15 @@ async function render() {
       : data.source === 'demo'
         ? `<div class="mkt-note">demo values — add a Finnhub / Twelve Data key in Settings for live quotes.</div>`
         : '');
+  /* roll each price from its previous value (odometer effect) */
+  list.querySelectorAll('.mkt-row').forEach(row => {
+    const s = row.querySelector('.mkt-sym')?.textContent;
+    const px = row.querySelector('.mkt-px');
+    if (!s || !px) return;
+    const next = px.textContent;
+    px.dataset.od = prevPx[s] || '';
+    odometer(px, next);
+  });
 }
 
 export default {

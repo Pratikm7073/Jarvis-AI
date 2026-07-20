@@ -109,6 +109,7 @@ export function initVoice({ focusApi, widgets, setLine }) {
     active = true;
     btn.classList.add('live');
     btn.setAttribute('aria-pressed', 'true');
+    document.body.classList.add('jarvis-listening');   // aurora frame swells
     setLine('🎙 Listening — say “open calendar”, “add task…”, “what’s my workout”');
   }
   function stop() {
@@ -117,6 +118,7 @@ export function initVoice({ focusApi, widgets, setLine }) {
     speechSynthesis.cancel();
     btn.classList.remove('live');
     btn.setAttribute('aria-pressed', 'false');
+    document.body.classList.remove('jarvis-listening');
     setLine('Voice off.');
   }
   btn.addEventListener('click', () => active ? stop() : start());

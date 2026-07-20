@@ -164,8 +164,12 @@ export function initConsole({ focusApi, widgets }) {
       blip(700, 380, .09, 0, .05);
     } else exit();
   }
-  addEventListener('resize', () => mode && paintRing(), { passive: true });
-  addEventListener('scroll', () => mode && paintRing(), { passive: true });
+  /* rAF-coalesced: smooth scrolling fires dozens of events per frame —
+     repaint the ring at most once per frame */
+  let ringRaf = 0;
+  const queueRing = () => { if (mode && !ringRaf) ringRaf = requestAnimationFrame(() => { ringRaf = 0; paintRing(); }); };
+  addEventListener('resize', queueRing, { passive: true });
+  addEventListener('scroll', queueRing, { passive: true });
 
   /* keyboard drives the same rails */
   addEventListener('keydown', e => {

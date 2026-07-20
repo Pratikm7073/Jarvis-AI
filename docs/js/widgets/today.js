@@ -5,6 +5,7 @@
 import { store } from '../store.js';
 import { getWeather, wmo } from '../api.js';
 import { esc } from '../ui.js';
+import { odometer } from '../fx.js';
 
 let wx = null, clockTimer = null;
 
@@ -13,7 +14,7 @@ function tickClock() {
   const clock = document.getElementById('tsClock');
   const date = document.getElementById('tsDate');
   const greet = document.getElementById('tsGreeting');
-  clock.textContent = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  odometer(clock, now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
   date.textContent = now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   const h = now.getHours();
   const part = h < 5 ? 'Burning the midnight oil' :

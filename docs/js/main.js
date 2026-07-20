@@ -15,6 +15,7 @@ import { initVoice } from './voice.js';
 import { initPremium } from './premium.js';
 import { initBoot } from './boot.js';
 import { initConsole } from './console.js';
+import { initFx, scramble } from './fx.js';
 
 initBoot();   // power-on curtain goes up first (skips itself when not wanted)
 
@@ -65,7 +66,7 @@ export const focusApi = {
     if (focusId) this.close();
     focusId = id;
     document.getElementById('focusIcon').textContent = w.icon;
-    document.getElementById('focusTitle').textContent = w.title;
+    scramble(document.getElementById('focusTitle'), w.title, { step: 14 });
     /* the dialog wears the widget's accent color */
     const srcCard = document.querySelector(`.widget-card[data-widget="${id}"]`);
     if (srcCard) {
@@ -122,6 +123,7 @@ document.getElementById('tsWeather').addEventListener('click', () => focusApi.op
 
 initPremium();
 initConsole({ focusApi, widgets });
+initFx();
 
 /* voice assistant (no CDN dependency — works even offline) */
 const setLine = t => { document.getElementById('reactorLine').textContent = t; };
@@ -159,18 +161,8 @@ function startTypewriter() {
   let li = 0;
   function typeLine() {
     const text = LINES[li % LINES.length]; li++;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      lineEl.textContent = text;   // no typewriter under reduced motion
-      return;
-    }
-    let i = 0;
-    lineEl.innerHTML = '<span class="ai-caret"></span>';
-    const tick = setInterval(() => {
-      if (document.hidden) return;
-      i++;
-      lineEl.innerHTML = text.slice(0, i) + '<span class="ai-caret"></span>';
-      if (i >= text.length) clearInterval(tick);
-    }, 34);
+    // dot-matrix glyph resolve (ref B6) replaced the typewriter
+    scramble(lineEl, text, { step: 22, hold: 2 });
   }
   typeLine();
   setInterval(typeLine, 9000);
