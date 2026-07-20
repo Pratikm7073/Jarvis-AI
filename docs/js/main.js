@@ -13,6 +13,10 @@ import earth from './widgets/earth.js';
 import settings from './widgets/settings.js';
 import { initVoice } from './voice.js';
 import { initPremium } from './premium.js';
+import { initBoot } from './boot.js';
+import { initConsole } from './console.js';
+
+initBoot();   // power-on curtain goes up first (skips itself when not wanted)
 
 const REGISTRY = [tasks, gym, calendar, fitness, news, markets, earth, settings, today];
 const widgets = Object.fromEntries(REGISTRY.map(w => [w.id, w]));
@@ -117,6 +121,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape') focusApi.close(); });
 document.getElementById('tsWeather').addEventListener('click', () => focusApi.open('weather'));
 
 initPremium();
+initConsole({ focusApi, widgets });
 
 /* voice assistant (no CDN dependency — works even offline) */
 const setLine = t => { document.getElementById('reactorLine').textContent = t; };

@@ -33,7 +33,7 @@ function entrance() {
   reveal(document.getElementById('reactorStage'), 260);
   reveal(document.querySelector('footer'), 900);
   const cards = [...document.querySelectorAll('.widget-card')];
-  if (reduced()) { cards.forEach(c => c.classList.add('pv-in')); return; }
+  if (reduced()) { cards.forEach(c => c.classList.add('pv-in', 'pv-done')); return; }
   const io = new IntersectionObserver(entries => {
     entries.forEach(e => {
       if (!e.isIntersecting) return;
@@ -43,7 +43,11 @@ function entrance() {
       const idx = cards.indexOf(el) % 3;
       el.style.transitionDelay = `${380 + idx * 70}ms`;
       el.classList.add('pv-in');
-      el.addEventListener('transitionend', () => { el.style.transitionDelay = ''; }, { once: true });
+      // pv-done releases the entrance transition so console-mode
+      // tilt can drive transforms at its own speed
+      const settle = () => { el.style.transitionDelay = ''; el.classList.add('pv-done'); };
+      el.addEventListener('transitionend', settle, { once: true });
+      setTimeout(settle, 1600);
     });
   }, { threshold: 0.12 });
   cards.forEach(c => io.observe(c));

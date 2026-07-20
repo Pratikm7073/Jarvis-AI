@@ -59,6 +59,14 @@ Click the **🎙 JARVIS** chip in the header and allow the microphone. Then just
 
 Replies are spoken aloud and typed on the status line under Ultron.
 
+### Console Mode — drive it like an Xbox 🎮
+
+Press any **arrow key** (or just connect a **game controller** — Xbox/PlayStation, wired or Bluetooth) and a glowing focus ring appears that snaps between widget tiles, colored to match each one. D-pad/left-stick to move, **Ⓐ/Enter** to open, **Ⓑ/Esc** to close, **LB/RB or ←/→** to switch tabs inside a widget, **Start** toggles gestures. Tiles also physically tilt in 3D toward your cursor.
+
+The part nobody's seen on a personal site: **haptics and spatial audio**. Every snap sends a tick of *rumble through the controller* (Gamepad haptics API), opening a widget thumps, hitting the grid edge bumps — and the synthesized UI sounds pan left/right in stereo to match where the tile sits on your screen. No audio files, all Web Audio. Everything degrades silently if unsupported.
+
+Each visit also opens with a skippable **Iron-Man boot sequence** — arc ring charges, systems check types out, "WELCOME BACK" — once per session (`?boot=1` replays it; disabled under reduced motion).
+
 ### Earth — your holographic Snap-Map
 
 The **🌍 Earth** widget is a real-textured 3D globe (NASA imagery) floating in the dashboard's starfield, wrapped in a cyan holo-graticule and atmosphere. Hit **📍 Fly to me** — it asks for your location (falls back to your saved city) and cinematically rotates the planet to land on you. As you descend, a dark holo-styled **street map of your actual neighbourhood** (free OpenStreetMap tiles, recolored to the theme) materialises as a circular projection, with a glowing **hologram avatar** standing at your position under a "YOURNAME · LIVE" tag. Drag to spin, scroll/pinch to zoom, double-click to fly home, **Full view** to zoom back out. No API keys; if the CDN is unreachable the globe renders as a pure wireframe hologram.
