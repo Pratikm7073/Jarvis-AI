@@ -71,12 +71,18 @@ button.ts-chip.mic:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(92,22
 button.ts-chip.mic.live{color:var(--pink);border-color:rgba(224,69,123,.55);animation:micPulse 1.3s infinite}
 @keyframes micPulse{50%{box-shadow:0 0 16px rgba(224,69,123,.55)}}
 
-/* ─── REACTOR STAGE ─────────────────────────────────── */
-#reactorStage{position:relative;height:40vh;min-height:280px}
-#reactorCanvas{width:100%;height:100%;display:block}
-/* fixed-width, left-typed line: the box never moves while the
-   typewriter runs, so it contributes zero layout shift */
-#reactorLine{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;width:min(92vw,620px);text-align:left;font-family:var(--mono);font-size:clamp(11px,1.2vw,13px);color:var(--cyan);letter-spacing:.14em;text-shadow:0 0 14px rgba(92,225,230,.55);white-space:nowrap;overflow:hidden}
+/* ─── STATUS LINE — slim, fixed-size box: zero layout shift ── */
+#reactorLine{position:relative;z-index:1;display:block;height:22px;margin:18px auto 4px;width:min(92vw,620px);text-align:left;font-family:var(--mono);font-size:clamp(11px,1.2vw,13px);color:var(--cyan);letter-spacing:.14em;text-shadow:0 0 14px rgba(92,225,230,.55);white-space:nowrap;overflow:hidden}
+
+/* thought-field legend chip (mode caption from the reference) */
+#constLegend{position:fixed;right:22px;top:74px;z-index:900;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--dim);background:rgba(6,8,14,.72);border:1px solid rgba(92,225,230,.3);border-radius:14px;padding:9px 14px;text-align:left;cursor:pointer;transition:border-color .25s,box-shadow .25s;max-width:210px;line-height:1.6}
+#constLegend b{color:var(--cyan);font-weight:600}
+#constLegend span{display:block;color:var(--faint);font-size:9px;letter-spacing:.05em}
+#constLegend:hover{border-color:var(--cyan);box-shadow:0 0 16px rgba(92,225,230,.25)}
+@media(max-width:700px){#constLegend{display:none}}
+
+/* hand landmark overlay */
+#handSkel{position:fixed;inset:0;z-index:9490;pointer-events:none}
 .ai-caret{display:inline-block;width:.56em;height:1.02em;background:var(--cyan);margin-left:5px;vertical-align:text-bottom;animation:caretBlink 1s steps(1) infinite;box-shadow:0 0 10px var(--cyan)}
 @keyframes caretBlink{50%{opacity:0}}
 
@@ -256,7 +262,6 @@ footer .cmd-link:hover{border-color:var(--cyan);box-shadow:0 0 16px rgba(92,225,
   .ts-mid{order:3;flex-basis:100%}
   .ts-right{flex-wrap:wrap;justify-content:flex-end}
   #tsStatus{display:none}          /* decorative — makes room for mic + weather */
-  #reactorStage{height:32vh;min-height:220px}
   .mkt-spark{display:none}         /* market rows fit a 390px viewport */
   .mkt-name{display:none}
   .fl-body{padding:8px 18px 20px}

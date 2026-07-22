@@ -39,7 +39,7 @@ export function initBoot() {
   const LINES = [
     'ARC REACTOR ............ ONLINE',
     'NEURAL LATTICE ......... SYNCED',
-    'ULTRON CORE ............ CONTAINED',
+    'THOUGHT FIELD .......... MAPPED',
     `WELCOME BACK, ${name}`,
   ];
   const linesEl = layer.querySelector('.boot-lines');

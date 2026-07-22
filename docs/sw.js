@@ -2,11 +2,11 @@
    Same-origin assets: stale-while-revalidate (fast loads, silent updates).
    Pinned CDN libs (three.js, MediaPipe): cache-first (immutable versions).
    API calls (weather, quotes, news): never cached here — always network. */
-const CACHE = 'jarvis-v8';
+const CACHE = 'jarvis-v9';
 const CORE = [
   './', './index.html', './command.html', './css/base.css', './css/gestures.css', './css/premium.css',
   './js/main.js', './js/store.js', './js/demo-data.js', './js/api.js', './js/ui.js',
-  './js/reactor.js', './js/background.js', './js/gestures.js', './js/gesture-core.js', './js/voice.js', './js/premium.js', './js/console.js', './js/boot.js', './js/fx.js',
+  './js/reactor.js', './js/background.js', './js/gestures.js', './js/gesture-core.js', './js/voice.js', './js/premium.js', './js/console.js', './js/boot.js', './js/fx.js', './js/constellation.js',
   './js/widgets/today.js', './js/widgets/tasks.js', './js/widgets/gym.js',
   './js/widgets/calendar.js', './js/widgets/news.js', './js/widgets/markets.js',
   './js/widgets/settings.js', './js/widgets/fitness.js', './js/widgets/earth.js',

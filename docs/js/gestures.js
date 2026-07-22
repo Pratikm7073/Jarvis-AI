@@ -74,11 +74,46 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
     return gQ.setFromRotationMatrix(gM);
   }
 
+  /* the grab target is now the whole thought-field: any EMPTY space
+     (not a card, chip, or control) is grabbable in grid view */
   function reactorUnderCursor() {
     if (focusApi.isOpen()) return false;
-    const rc = reactorApi.el.getBoundingClientRect();
-    if (rc.bottom < 60) return false;
-    return smX >= rc.left && smX <= rc.right && smY >= Math.max(0, rc.top) && smY <= Math.min(rc.bottom, innerHeight);
+    const el = document.elementFromPoint(smX, smY);
+    return !(el && el.closest('.widget-card, #todayStrip, footer, button, a, input, select, textarea, #gestureHud, #constLegend'));
+  }
+
+  /* ── finger-skeleton overlay: every tracked landmark drawn as a
+     dot with bone lines (the reference video's fingertip dots) —
+     live feedback that also makes aiming visibly more accurate ── */
+  const skel = document.createElement('canvas');
+  skel.id = 'handSkel';
+  document.body.appendChild(skel);
+  const skCtx = skel.getContext('2d');
+  const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  const TIPS = new Set([4, 8, 12, 16, 20]);
+  function sizeSkel() { skel.width = innerWidth; skel.height = innerHeight; }
+  sizeSkel(); addEventListener('resize', sizeSkel, { passive: true });
+  function drawHands(all) {
+    skCtx.clearRect(0, 0, skel.width, skel.height);
+    if (!all) return;
+    for (const lm of all) {
+      const P = lm.map(p => [(1 - p.x) * innerWidth, p.y * innerHeight]);
+      skCtx.strokeStyle = 'rgba(92,225,230,.28)';
+      skCtx.lineWidth = 1.5;
+      skCtx.beginPath();
+      for (const [a, b] of BONES) { skCtx.moveTo(P[a][0], P[a][1]); skCtx.lineTo(P[b][0], P[b][1]); }
+      skCtx.stroke();
+      for (let i = 0; i < 21; i++) {
+        const tip = TIPS.has(i);
+        skCtx.beginPath();
+        skCtx.arc(P[i][0], P[i][1], tip ? 5 : 2.6, 0, 7);
+        skCtx.shadowColor = '#5ce1e6';
+        skCtx.shadowBlur = tip ? 10 : 0;
+        skCtx.fillStyle = tip ? '#eafeff' : 'rgba(92,225,230,.6)';
+        skCtx.fill();
+        skCtx.shadowBlur = 0;
+      }
+    }
   }
 
   function startGrab(mode, lm) {
@@ -192,6 +227,7 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
   }
 
   function onResults(r) {
+    drawHands(r.multiHandLandmarks?.length ? r.multiHandLandmarks : null);
     const lm = r.multiHandLandmarks && r.multiHandLandmarks[0];
     /* handedness score = MediaPipe's own confidence in this hand.
        below .55 the landmarks are garbage — treat as a dropout. */
@@ -449,6 +485,7 @@ export function initGestures({ reactorApi, focusApi, widgets, bg }) {
     cursor.classList.remove('scrollUp', 'scrollDn', 'lost', 'pinch');
     btn.classList.remove('live'); btn.innerHTML = '<span class="gb-dot"></span>✋ Gesture Control';
     reactorApi.releasePointer(); bg && bg.releasePointer(); setHover(null);
+    drawHands(null);
     lastX = null; scrollVel = 0; lastSeen = 0; lastPinchAt = 0; seenFrames = 0;
     twoHand = false; grab = null; palmHold = 0;
     pointF.reset(); predictor.reset(); pinchGate.reset(); fistGate.reset();

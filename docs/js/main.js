@@ -150,11 +150,11 @@ addEventListener('jarvis:settings-changed', () => {
 
 /* reactor status line typewriter */
 const LINES = [
-  'ULTRON CORE ONLINE — ALL SYSTEMS NOMINAL',
-  'THERE ARE NO STRINGS ON ME',
+  'THOUGHT FIELD ONLINE — ALL SYSTEMS NOMINAL',
+  'YOUR DAY, MAPPED IN SPACE',
   'PINCH A CARD TO OPEN IT',
-  'GRAB MY HEAD — ROTATE YOUR WRIST',
-  'BOTH HANDS: ROTATE · TWIST · ZOOM',
+  'PINCH EMPTY SPACE — ROTATE YOUR WRIST',
+  'TAP THE LEGEND TO RE-TOPOLOGIZE',
 ];
 function startTypewriter() {
   const lineEl = document.getElementById('reactorLine');
@@ -173,21 +173,17 @@ function startTypewriter() {
    and the dashboard must survive that CDN being down —
    widgets + mouse control keep working regardless */
 try {
-  const [{ initReactor }, { initGestures }, { initBackground }] = await Promise.all([
-    import('./reactor.js'),
+  const [{ initGestures }, { initConstellation }] = await Promise.all([
     import('./gestures.js'),
-    import('./background.js'),
+    import('./constellation.js'),
   ]);
-  let bg = null;
-  try { bg = initBackground(); }   // null on reduced-motion; must never kill the head
-  catch (e) { console.warn('space background unavailable', e); }
-  const reactorApi = initReactor(document.getElementById('reactorCanvas'));
-  initGestures({ reactorApi, focusApi, widgets, bg });
+  /* the thought-field IS the background and the grab target: it
+     implements the same seam the old reactor exposed */
+  const reactorApi = await initConstellation(document.getElementById('bg3d'));
+  initGestures({ reactorApi, focusApi, widgets, bg: reactorApi });
   startTypewriter();
 } catch (e) {
   console.warn('3D/gesture engine unavailable (CDN unreachable?)', e);
-  document.getElementById('reactorStage').style.height = '10vh';
-  document.getElementById('reactorStage').style.minHeight = '70px';
   document.getElementById('gestureBtn').style.display = 'none';
   document.getElementById('reactorLine').textContent = 'HOLO-CORE OFFLINE — dashboard running in standard mode';
 }

@@ -59,6 +59,14 @@ Click the **🎙 JARVIS** chip in the header and allow the microphone. Then just
 
 Replies are spoken aloud and typed on the status line under Ultron.
 
+### The Thought Field — your living background
+
+The dashboard's backdrop is a **hand-navigable knowledge graph of your actual day** (inspired by the "Topologies of Thoughts" interface). Today's tasks, this week's workout, upcoming events, your market watchlist and live headlines float as monospace notes clustered around glowing `[Topic]` labels in the screen's margins, drifting in 3D parallax. Tap the **legend chip** (top-right) to animate the whole field between two topologies — *decentralized* (notes grouped in clusters by topic) and *distributed* (notes connected by relationship edges). Pinch empty space and rotate your wrist to spin the field; two hands to zoom.
+
+### Finger tracking — 21-point skeleton
+
+When gestures are on, your hand is drawn as a **live 21-landmark skeleton** — glowing dots on every knuckle and fingertip, connected by bone lines (exactly like pro hand-tracking interfaces). It's not just decoration: seeing the tracked points is immediate feedback that makes pinches and pointing visibly more precise.
+
 ### Console Mode — drive it like an Xbox 🎮
 
 Press any **arrow key** (or just connect a **game controller** — Xbox/PlayStation, wired or Bluetooth) and a glowing focus ring appears that snaps between widget tiles, colored to match each one. D-pad/left-stick to move, **Ⓐ/Enter** to open, **Ⓑ/Esc** to close, **LB/RB or ←/→** to switch tabs inside a widget, **Start** toggles gestures. Tiles also physically tilt in 3D toward your cursor.
