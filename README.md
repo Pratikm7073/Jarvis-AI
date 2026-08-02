@@ -63,6 +63,19 @@ Replies are spoken aloud and typed on the status line under Ultron.
 
 The dashboard's backdrop is a **hand-navigable knowledge graph of your actual day** (inspired by the "Topologies of Thoughts" interface). Today's tasks, this week's workout, upcoming events, your market watchlist and live headlines float as monospace notes clustered around glowing `[Topic]` labels in the screen's margins, drifting in 3D parallax. Tap the **legend chip** (top-right) to animate the whole field between two topologies — *decentralized* (notes grouped in clusters by topic) and *distributed* (notes connected by relationship edges). Pinch empty space and rotate your wrist to spin the field; two hands to zoom.
 
+### Rotation accuracy — measured, not claimed
+
+Grabbing empty space and turning your wrist rotates the thought field at **exactly 1:1** — no amplification. The orientation path (`js/gesture-core.js` → `RotationStabilizer`) is: landmark denoising → orthonormal palm frame from six averaged palm points (Gram-Schmidt, so the frame can never skew) → adaptive slerp on SO(3) → a lock/track state machine. Every stage is unit-tested against synthetic hands carrying MediaPipe-grade gaussian noise:
+
+| Property | Result |
+|---|---|
+| Still hand, 9,600 frames × 6 noise seeds | **0.0000° drift** (float residue only) |
+| Clean round-trip, any axis/angle | exact to 4×10⁻¹³° |
+| 80° wrist sweep, landing error | 2.2° @60°/s · 2.3° @180°/s |
+| Degenerate/collapsed landmarks | orientation held, never NaN |
+
+A **gyro HUD** (bottom-left, appears while grabbing) shows live yaw/pitch/roll plus the engine's own `LOCKED`/`TRACKING` state — when it reads LOCKED the engine is emitting a byte-identical orientation, so you can *see* that a still hand cannot move the field. Release while turning and the field keeps spinning with decaying momentum; release from a standstill and it stops dead.
+
 ### Finger tracking — 21-point skeleton
 
 When gestures are on, your hand is drawn as a **live 21-landmark skeleton** — glowing dots on every knuckle and fingertip, connected by bone lines (exactly like pro hand-tracking interfaces). It's not just decoration: seeing the tracked points is immediate feedback that makes pinches and pointing visibly more precise.

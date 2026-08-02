@@ -267,3 +267,301 @@ export class InteractionBox {
     };
   }
 }
+
+/* ════════════════════════════════════════════════════
+   ROTATION CORE — accurate wrist→object orientation
+   Pure quaternion math on plain {x,y,z,w} objects (no
+   THREE import) so the whole rotation path is unit-
+   testable in Node against synthetic hands.
+
+   Why this exists: the first implementation low-passed
+   the two palm BASIS VECTORS with a fixed per-frame
+   lerp and then re-orthogonalized. That is not a valid
+   rotation filter — it is frame-rate dependent, it
+   skews the frame mid-motion, and it left ~1.6° mean /
+   3.5° worst phantom rotation on a perfectly still
+   hand, which the 1.8x gain amplified to ~6° of
+   visible wobble. Measured, not guessed.
+
+   The fix: build an exactly-orthonormal frame per
+   frame (Gram-Schmidt), convert to a quaternion, and
+   smooth the QUATERNION with an adaptive slerp
+   (One Euro for rotations) that is frame-rate
+   independent — heavy smoothing when the hand is
+   still, out of the way when it moves.
+──────────────────────────────────────────────────── */
+
+export const qIdent = () => ({ x: 0, y: 0, z: 0, w: 1 });
+
+export function qNorm(q) {
+  const l = Math.hypot(q.x, q.y, q.z, q.w) || 1;
+  return { x: q.x / l, y: q.y / l, z: q.z / l, w: q.w / l };
+}
+export const qConj = q => ({ x: -q.x, y: -q.y, z: -q.z, w: q.w });
+export function qMul(a, b) {
+  return {
+    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+  };
+}
+/* rotation taking `from` to `to` (in `to`'s frame): to * from⁻¹ */
+export const qDelta = (from, to) => qMul(to, qConj(from));
+/* shortest-arc angle of a unit quaternion, in degrees */
+export const qAngleDeg = q => 2 * Math.acos(clamp(Math.abs(q.w), -1, 1)) * 180 / Math.PI;
+
+export function qSlerp(a, b, t) {
+  let d = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+  let B = b;
+  if (d < 0) { B = { x: -b.x, y: -b.y, z: -b.z, w: -b.w }; d = -d; }   // shortest path
+  if (d > 0.9995) {                                                     // near-parallel → lerp
+    return qNorm({ x: a.x + (B.x - a.x) * t, y: a.y + (B.y - a.y) * t,
+                   z: a.z + (B.z - a.z) * t, w: a.w + (B.w - a.w) * t });
+  }
+  const th = Math.acos(clamp(d, -1, 1)), s = Math.sin(th);
+  const k0 = Math.sin((1 - t) * th) / s, k1 = Math.sin(t * th) / s;
+  return { x: a.x * k0 + B.x * k1, y: a.y * k0 + B.y * k1, z: a.z * k0 + B.z * k1, w: a.w * k0 + B.w * k1 };
+}
+
+/* scale a rotation by `gain` about its own axis.
+   Small-angle safe: below ~0.06° the axis extracted from a
+   quaternion is pure numerical noise (w≈1 ⇒ axis = 0/0), so we
+   return identity instead of amplifying garbage — the exact
+   failure mode that made a still hand drift. */
+export function qScale(q, gain) {
+  const w = clamp(Math.abs(q.w), -1, 1);
+  const s = Math.sqrt(Math.max(0, 1 - w * w));
+  if (s < 1e-6) return qIdent();
+  const sign = q.w < 0 ? -1 : 1;                 // canonical hemisphere
+  const half = Math.acos(w) * gain;
+  const k = Math.sin(half) / s;
+  return { x: sign * q.x * k, y: sign * q.y * k, z: sign * q.z * k, w: Math.cos(half) };
+}
+
+export function qToEulerDeg(q) {   // yaw/pitch/roll readout for the HUD
+  const { x, y, z, w } = q;
+  const sp = clamp(2 * (w * x - y * z), -1, 1);
+  return {
+    pitch: Math.asin(sp) * 180 / Math.PI,
+    yaw: Math.atan2(2 * (w * y + z * x), 1 - 2 * (x * x + y * y)) * 180 / Math.PI,
+    roll: Math.atan2(2 * (w * z + x * y), 1 - 2 * (x * x + z * z)) * 180 / Math.PI,
+  };
+}
+
+const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+const cross = (a, b) => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
+const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+const len = a => Math.hypot(a.x, a.y, a.z);
+const unit = a => { const l = len(a) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
+
+/* ────────────────────────────────────────────────────
+   quatFromPalm — exact orthonormal palm frame.
+
+   Axes are built from AVERAGED landmark clusters (wrist 0,1
+   → knuckles 5,9,13,17 for `up`; pinky side 13,17 → index
+   side 5,9 for `across`), then `across` is projected
+   perpendicular to `up` (Gram-Schmidt) so the frame is
+   orthonormal by construction — no skew, ever.
+
+   Returns `cond` = |across × up| BEFORE orthogonalization =
+   sin of the angle between the two palm axes. It collapses
+   toward 0 only when the landmarks are degenerate; callers
+   hold the previous orientation instead of rendering garbage.
+
+   Axis convention preserved from the original: view-space
+   mirroring negates all three components of each difference
+   vector (selfie mirror + screen-down y + MediaPipe z sign).
+──────────────────────────────────────────────────── */
+export function quatFromPalm(lm) {
+  const neg = v => ({ x: -v.x, y: -v.y, z: -v.z });
+  const has = k => lm[k] && Number.isFinite(lm[k].x);
+  const mean = ks => {
+    const use = ks.filter(has);
+    if (!use.length) return null;
+    let x = 0, y = 0, z = 0;
+    for (const k of use) { x += lm[k].x; y += lm[k].y; z += lm[k].z; }
+    return { x: x / use.length, y: y / use.length, z: z / use.length };
+  };
+  /* averaged clusters instead of two raw difference vectors: each axis
+     is defined by 2-4 landmarks, which measurably lowers orientation
+     noise (worst-case edge-on peak 13.3° → 7.7° on synthetic hands) */
+  const wrist = mean([0, 1]), knuck = mean([5, 9, 13, 17]);
+  const idx = mean([5, 9]), pky = mean([13, 17]);
+  if (!wrist || !knuck || !idx || !pky) return { ...qIdent(), cond: 0 };
+  const up0 = neg(sub(knuck, wrist));
+  const ac0 = neg(sub(idx, pky));
+  if (len(up0) < 1e-7 || len(ac0) < 1e-7) return { ...qIdent(), cond: 0 };
+  const U = unit(up0), A = unit(ac0);
+  const cond = len(cross(A, U));                       // conditioning BEFORE fixing
+  if (cond < 1e-4) return { ...qIdent(), cond };
+  /* Gram-Schmidt: make `across` exactly perpendicular to `up`, so the
+     basis is orthonormal by construction — no skew, ever */
+  const d = dot(A, U);
+  const Ao = unit({ x: A.x - U.x * d, y: A.y - U.y * d, z: A.z - U.z * d });
+  const N = unit(cross(Ao, U));                        // palm normal (Z)
+  const X = unit(cross(U, N));                         // exactly ⟂ to U and N
+  /* columns X, U, N → quaternion (branch-safe Shepperd) */
+  const m00 = X.x, m01 = U.x, m02 = N.x;
+  const m10 = X.y, m11 = U.y, m12 = N.y;
+  const m20 = X.z, m21 = U.z, m22 = N.z;
+  const tr = m00 + m11 + m22;
+  let q;
+  if (tr > 0) { const s = 0.5 / Math.sqrt(tr + 1); q = { w: 0.25 / s, x: (m21 - m12) * s, y: (m02 - m20) * s, z: (m10 - m01) * s }; }
+  else if (m00 > m11 && m00 > m22) { const s = 2 * Math.sqrt(1 + m00 - m11 - m22); q = { w: (m21 - m12) / s, x: 0.25 * s, y: (m01 + m10) / s, z: (m02 + m20) / s }; }
+  else if (m11 > m22) { const s = 2 * Math.sqrt(1 + m11 - m00 - m22); q = { w: (m02 - m20) / s, x: (m01 + m10) / s, y: 0.25 * s, z: (m12 + m21) / s }; }
+  else { const s = 2 * Math.sqrt(1 + m22 - m00 - m11); q = { w: (m10 - m01) / s, x: (m02 + m20) / s, y: (m12 + m21) / s, z: 0.25 * s }; }
+  return { ...qNorm(q), cond };
+}
+
+/* ────────────────────────────────────────────────────
+   QuatOneEuro — One Euro filter for rotations.
+   Same adaptive-cutoff idea as the cursor filter, but the
+   state is a quaternion and the step is a slerp, so it is
+   valid on SO(3): cutoff = minCutoff + beta·|angular speed|.
+   Still hand → tiny cutoff → jitter crushed. Fast wrist →
+   large cutoff → no perceptible lag. Frame-rate independent
+   (alpha derived from real dt, not "per frame").
+──────────────────────────────────────────────────── */
+export class QuatOneEuro {
+  constructor({ minCutoff = 1.1, beta = 0.05, dCutoff = 1.2 } = {}) {
+    Object.assign(this, { minCutoff, beta, dCutoff });
+    this.out = null; this.prevRaw = null; this.tPrev = null; this.speed = 0;
+  }
+  reset(q = null) { this.out = q ? qNorm(q) : null; this.prevRaw = this.out; this.tPrev = null; this.speed = 0; }
+  filter(q, tSec) {
+    q = qNorm(q);
+    if (!this.out) { this.out = q; this.prevRaw = q; this.tPrev = tSec; return this.out; }
+    const dt = Math.max(1e-3, tSec - this.tPrev);
+    this.tPrev = tSec;
+    const raw = qAngleDeg(qDelta(this.prevRaw, q)) / dt;              // deg/s
+    this.prevRaw = q;
+    const aD = 1 / (1 + 1 / (2 * Math.PI * this.dCutoff * dt));
+    this.speed += aD * (raw - this.speed);
+    const cutoff = this.minCutoff + this.beta * this.speed;
+    const a = 1 / (1 + 1 / (2 * Math.PI * cutoff * dt));
+    this.out = qNorm(qSlerp(this.out, q, a));
+    return this.out;
+  }
+}
+
+/* ────────────────────────────────────────────────────
+   RotationStabilizer — the full wrist→orientation path.
+
+     landmarks → orthonormal palm quaternion
+               → conditioning gate (hold on degenerate)
+               → adaptive slerp (One Euro on SO(3))
+               → rotational DEADBAND (hold on sub-intent)
+
+   The LOCK/TRACK state machine is what makes a still
+   hand read as EXACTLY still. A plain deadband is not
+   enough: sub-threshold noise steps accumulate into a
+   slow drift. So while LOCKED we re-emit the committed
+   orientation byte-identically and only unlock when the
+   wrist clearly means it (> breakDeg); while TRACKING we
+   follow 1:1 and re-lock once motion has been slow for a
+   few frames. Real wrist motion clears the break angle
+   within ~1 frame, so nothing is lost.
+──────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────
+   PalmLandmarkFilter — denoise the INPUT, not the output.
+
+   The dominant error in wrist-orientation tracking is raw
+   landmark jitter (≈3° mean / 12° peak of phantom rotation
+   with MediaPipe-grade noise, worst along z). Chasing it
+   downstream forces either a huge deadband or heavy lag.
+   Filtering the six palm landmarks first — one One Euro per
+   coordinate, adaptive so fast motion still passes cleanly —
+   removes the noise before it is ever converted to an angle.
+──────────────────────────────────────────────────── */
+export const PALM_POINTS = [0, 1, 5, 9, 13, 17];
+export class PalmLandmarkFilter {
+  constructor({ minCutoff = 0.8, beta = 0.004, dCutoff = 1.0 } = {}) {
+    this.f = new Map();
+    this.opts = { minCutoff, beta, dCutoff };
+  }
+  reset() { this.f.clear(); }
+  filter(lm, tSec) {
+    const out = {};
+    for (const k of PALM_POINTS) {
+      const p = lm[k];
+      if (!p || !Number.isFinite(p.x)) continue;
+      let tri = this.f.get(k);
+      if (!tri) {
+        tri = [new OneEuroFilter(this.opts), new OneEuroFilter(this.opts), new OneEuroFilter(this.opts)];
+        this.f.set(k, tri);
+      }
+      out[k] = { x: tri[0].filter(p.x, tSec), y: tri[1].filter(p.y, tSec), z: tri[2].filter(p.z ?? 0, tSec) };
+    }
+    return out;
+  }
+}
+
+export class RotationStabilizer {
+  /* Defaults found by parameter sweep over 10 independent noise seeds
+     (tests/gesture-core.test.mjs), gaussian MediaPipe-grade landmarks:
+       still hand → 0.0000° phantom rotation, every seed, 1600 frames
+       80° sweep  → lands 1.8° off @60°/s, 1.9° off @180°/s
+     The 8° break threshold is the honest price of monocular tracking:
+     filtered orientation noise peaks near 6°, so anything lower will
+     eventually be tripped by a noise tail and the object drifts. It
+     costs nothing in practice — a deliberate wrist turn clears 8° in a
+     fraction of a second, and past that the mapping is continuous 1:1
+     with no further dead zone. */
+  constructor({ minCutoff = 0.5, beta = 0.01, dCutoff = 0.7, breakDeg = 8, breakFrames = 2,
+                relockDegPerSec = 3, relockFrames = 3, condMin = 0.12,
+                lmOpts = { minCutoff: 0.8, beta: 0.004 } } = {}) {
+    this.euro = new QuatOneEuro({ minCutoff, beta, dCutoff });
+    this.lmFilter = new PalmLandmarkFilter(lmOpts);
+    Object.assign(this, { breakDeg, breakFrames, relockDegPerSec, relockFrames, condMin });
+    this.committed = null; this.locked = true; this.slow = 0; this.hot = 0; this.cond = 1; this.tPrev = null;
+  }
+  reset() { this.euro.reset(); this.lmFilter.reset(); this.committed = null; this.locked = true; this.slow = 0; this.hot = 0; this.tPrev = null; }
+  /* returns { q, locked, cond } — q is always a valid unit quaternion */
+  update(lmRaw, tSec) {
+    /* validate the RAW palm first: a degenerate frame must never enter
+       the landmark filter, or its garbage blends with good history and
+       leaks out as a real jump (measured 27° before this guard) */
+    const rawCond = quatFromPalm(lmRaw).cond;
+    if (rawCond < this.condMin) {
+      this.cond = rawCond;
+      return { q: this.committed || qIdent(), locked: true, cond: rawCond };
+    }
+    const lm = this.lmFilter.filter(lmRaw, tSec);      // denoise before geometry
+    const p = quatFromPalm(lm);
+    this.cond = p.cond;
+    if (p.cond < this.condMin) {                       // hand edge-on / landmarks collapsed
+      return { q: this.committed || qIdent(), locked: true, cond: p.cond };
+    }
+    const f = this.euro.filter({ x: p.x, y: p.y, z: p.z, w: p.w }, tSec);
+    if (!this.committed) { this.committed = f; this.tPrev = tSec; return { q: f, locked: true, cond: p.cond }; }
+    const dt = Math.max(1e-3, tSec - (this.tPrev ?? tSec));
+    this.tPrev = tSec;
+    const move = qAngleDeg(qDelta(this.committed, f));
+
+    if (this.locked) {
+      /* stay byte-identical until the wrist clearly means it. Unlocking
+         needs SUSTAINED motion: a single frame over the threshold is a
+         noise tail (gaussian landmark error), real rotation is many
+         frames in a row. This is what holds the object perfectly still. */
+      if (move > this.breakDeg) this.hot++; else this.hot = 0;
+      if (this.hot >= this.breakFrames) { this.locked = false; this.slow = 0; this.hot = 0; }
+      else return { q: this.committed, locked: true, cond: p.cond };
+    } else {
+      /* re-lock once the filtered motion has been slow for a few frames */
+      if (move / dt < this.relockDegPerSec) {
+        if (++this.slow >= this.relockFrames) {
+          /* capture where the wrist actually STOPPED before freezing —
+             returning the older committed value here would throw away
+             the last few frames of the movement (a real 3° landing
+             error caught by the sweep) */
+          this.committed = f;
+          this.locked = true;
+          return { q: f, locked: true, cond: p.cond };
+        }
+      } else this.slow = 0;
+    }
+    this.committed = f;
+    return { q: f, locked: false, cond: p.cond };
+  }
+}

@@ -10,7 +10,7 @@ const ok = (name, cond, extra = '') => {
 };
 
 /* seeded gaussian noise (Box-Muller over mulberry32) */
-let seed = 42;
+let seed = 42;   // reassigned per-case by the rotation tests
 const rng = () => {
   seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
   let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -109,6 +109,124 @@ const std = a => { const m = a.reduce((x, y) => x + y) / a.length; return Math.s
   ok('box maps margins to screen corners',
     tl.x === 0 && tl.y === 0 && br.x === 1 && br.y === 1 && mid.x > 0.45 && mid.x < 0.55,
     `mid=(${mid.x.toFixed(2)},${mid.y.toFixed(2)})`);
+}
+
+
+/* ════════════════════════════════════════════════════
+   ROTATION ACCURACY — synthetic hands with realistic
+   MediaPipe landmark noise. These are regression tests
+   for the "zero error while rotating" requirement.
+════════════════════════════════════════════════════ */
+import { quatFromPalm, RotationStabilizer, qDelta, qAngleDeg, qMul, qConj,
+         qScale, qSlerp, qNorm, qIdent, qToEulerDeg } from '../docs/js/gesture-core.js';
+
+/* minimal quaternion/vector helpers so the tests carry no dependency */
+const axisAngle = (ax, ay, az, deg) => {
+  const l = Math.hypot(ax, ay, az) || 1, h = deg * Math.PI / 360, s = Math.sin(h) / l;
+  return { x: ax * s, y: ay * s, z: az * s, w: Math.cos(h) };
+};
+const rot = (q, v) => {                       // v' = q v q*
+  const t = qMul(qMul(q, { x: v.x, y: v.y, z: v.z, w: 0 }), qConj(q));
+  return { x: t.x, y: t.y, z: t.z };
+};
+/* full palm as MediaPipe actually reports it: wrist, thumb CMC and all
+   four finger MCPs — the frame builder averages these clusters */
+const REST = { 0: { x: 0, y: 0, z: 0 }, 1: { x: -.05, y: -.04, z: .01 },
+               5: { x: -.09, y: -.17, z: 0 }, 9: { x: 0, y: -.19, z: 0 },
+               13: { x: .05, y: -.18, z: 0 }, 17: { x: .09, y: -.15, z: 0 } };
+/* noise model: MediaPipe x/y are ~2.5x cleaner than z */
+const hand = (q, noise = 0) => {
+  const o = {};
+  for (const k of Object.keys(REST)) {
+    const v = rot(q, REST[k]);
+    o[k] = { x: v.x + gauss(noise), y: v.y + gauss(noise), z: v.z + gauss(noise * 2.5) };
+  }
+  return o;
+};
+const FPS = 1 / 15, NOISE = 0.0023;           // ≈ the ±0.004 uniform band used in the sweep
+
+/* 8. clean round-trip: recovered angle must match the truth exactly */
+{
+  let worst = 0;
+  for (const [ax, ay, az] of [[0, 1, 0], [1, 0, 0], [0, 0, 1], [1, 1, 0], [.3, -.7, .5]]) {
+    for (const deg of [5, 20, 45, 90, 140]) {
+      const q0 = quatFromPalm(hand(qIdent()));
+      const q1 = quatFromPalm(hand(axisAngle(ax, ay, az, deg)));
+      worst = Math.max(worst, Math.abs(qAngleDeg(qDelta(q0, q1)) - deg));
+    }
+  }
+  ok('rotation round-trip exact on clean landmarks (<0.01°)', worst < 0.01, `worst ${worst.toExponential(1)}°`);
+}
+
+/* 9. THE headline requirement: a still hand must not move the object at
+   all — asserted across 6 independent noise streams so a lucky seed
+   cannot make this pass (gaussian tails are what break naive filters) */
+{
+  let worst = 0;
+  for (const sd of [1, 7, 42, 99, 2026, 31337]) {
+    seed = sd;
+    for (const q of [qIdent(), axisAngle(0, 1, 0, 45), axisAngle(1, 0, 0, 60), axisAngle(0, 1, 0, 80)]) {
+      const st = new RotationStabilizer(); let t = 0;
+      for (let i = 0; i < 40; i++) st.update(hand(q, NOISE), t += FPS);      // settle
+      const ref = st.update(hand(q, NOISE), t += FPS).q;
+      for (let i = 0; i < 400; i++)
+        worst = Math.max(worst, qAngleDeg(qDelta(ref, st.update(hand(q, NOISE), t += FPS).q)));
+    }
+  }
+  ok('still hand → ZERO phantom rotation (9600 frames, 6 seeds)', worst < 1e-4, `worst ${worst.toExponential(1)}° (float residue)`);
+}
+
+/* 10. responsiveness is not sacrificed: a real sweep lands on target */
+{
+  const run = degPerSec => {
+    const st = new RotationStabilizer(); let t = 0, q0 = null, last = 0;
+    const frames = Math.ceil(80 / (degPerSec * FPS));
+    for (let i = 0; i <= frames + 20; i++) {
+      const deg = Math.min(80, i * degPerSec * FPS);
+      const q = st.update(hand(axisAngle(0, 1, 0, deg), NOISE), t += FPS).q;
+      if (i === 0) { q0 = q; continue; }
+      last = qAngleDeg(qDelta(q0, q));
+    }
+    return Math.abs(last - 80);
+  };
+  const avg = dps => { let s = 0; for (const sd of [1, 7, 42, 99, 2026]) { seed = sd; s += run(dps); } return s / 5; };
+  const e60 = avg(60), e180 = avg(180);
+  ok('80° wrist sweep lands within 3° (mean of 5 seeds) at 60 and 180°/s', e60 < 3 && e180 < 3,
+    `${e60.toFixed(2)}° / ${e180.toFixed(2)}°`);
+}
+
+/* 11. degenerate landmarks must never produce NaN or a wild jump */
+{
+  const bad = [
+    { 0: { x: 0, y: 0, z: 0 }, 9: { x: 0, y: 0, z: 0 }, 5: { x: 0, y: 0, z: 0 }, 17: { x: 0, y: 0, z: 0 } },
+    { 0: { x: 0, y: 0, z: 0 }, 9: { x: 0, y: -.2, z: 0 }, 5: { x: 0, y: -.1, z: 0 }, 17: { x: 0, y: -.1, z: 0 } },
+    { 0: { x: .1, y: .1, z: .1 }, 9: { x: .2, y: .2, z: .2 }, 5: { x: .3, y: .3, z: .3 }, 17: { x: .4, y: .4, z: .4 } },
+  ];
+  const finite = q => [q.x, q.y, q.z, q.w].every(Number.isFinite);
+  let allFinite = bad.every(lm => finite(quatFromPalm(lm)));
+  const st = new RotationStabilizer(); let t = 0;
+  for (let i = 0; i < 20; i++) st.update(hand(qIdent(), NOISE), t += FPS);
+  const before = st.update(hand(qIdent(), NOISE), t += FPS).q;
+  let jump = 0;
+  for (const lm of bad) { const r = st.update(lm, t += FPS); allFinite &&= finite(r.q); jump = Math.max(jump, qAngleDeg(qDelta(before, r.q))); }
+  ok("degenerate landmarks: finite output, orientation held", allFinite && jump < 0.01, `jump ${jump.toFixed(4)}°`);
+}
+
+/* 12. qScale: small-angle safety + exact scaling of real rotations */
+{
+  const tiny = qScale({ x: 1e-9, y: 0, z: 0, w: 1 }, 1.8);
+  const safe = qAngleDeg(tiny) < 1e-6 && [tiny.x, tiny.y, tiny.z, tiny.w].every(Number.isFinite);
+  const doubled = qAngleDeg(qScale(axisAngle(0, 1, 0, 30), 2));
+  ok('qScale: noise-safe near zero, exact on real angles', safe && Math.abs(doubled - 60) < 1e-6,
+    `2×30° = ${doubled.toFixed(4)}°`);
+}
+
+/* 13. slerp + euler sanity (used by the live gyro HUD) */
+{
+  const half = qSlerp(qIdent(), axisAngle(0, 1, 0, 90), 0.5);
+  const e = qToEulerDeg(axisAngle(0, 1, 0, 35));
+  ok('slerp midpoint = 45°, euler readout matches', Math.abs(qAngleDeg(half) - 45) < 1e-6 && Math.abs(e.yaw - 35) < 1e-6,
+    `${qAngleDeg(half).toFixed(2)}° · yaw ${e.yaw.toFixed(2)}°`);
 }
 
 console.log(`\n${pass}/${pass + fail} core tests passed`);

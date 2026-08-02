@@ -2,7 +2,7 @@
    Same-origin assets: stale-while-revalidate (fast loads, silent updates).
    Pinned CDN libs (three.js, MediaPipe): cache-first (immutable versions).
    API calls (weather, quotes, news): never cached here — always network. */
-const CACHE = 'jarvis-v9';
+const CACHE = 'jarvis-v10';
 const CORE = [
   './', './index.html', './command.html', './css/base.css', './css/gestures.css', './css/premium.css',
   './js/main.js', './js/store.js', './js/demo-data.js', './js/api.js', './js/ui.js',
